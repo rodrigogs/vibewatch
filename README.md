@@ -256,6 +256,8 @@ Releases are automated via [Release Please](https://github.com/googleapis/releas
 
 **Manual release**: Just merge the automatically created "chore: release X.Y.Z" PR.
 
+**Setup Required**: Release Please needs a Personal Access Token to create PRs. See [`docs/RELEASE_PLEASE_SETUP.md`](docs/RELEASE_PLEASE_SETUP.md) for detailed setup instructions.
+
 ### CI/CD
 
 All PRs and pushes to `master` run:
@@ -267,6 +269,7 @@ All PRs and pushes to `master` run:
 ## Documentation
 
 For comprehensive technical documentation:
+- **Release Please Setup**: [`docs/RELEASE_PLEASE_SETUP.md`](docs/RELEASE_PLEASE_SETUP.md) - Configure automated releases with PAT
 - **Testing Guide**: `docs/TESTING.md` - Test organization, best practices, and quick reference
 - **Coverage Analysis**: `docs/COVERAGE.md` - Detailed coverage metrics and industry benchmarks
 - **Integration Tests**: `docs/INTEGRATION_TEST.md` - Testing research, rationale, and best practices
