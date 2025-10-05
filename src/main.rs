@@ -46,6 +46,13 @@ struct Args {
     )]
     verbose: bool,
 
+    /// Debounce delay in milliseconds to coalesce rapid events
+    #[arg(long, value_name = "MS", default_value = "100", help_heading = GENERAL_HELP)]
+    #[arg(
+        help = "Wait this many milliseconds before executing commands after an event\n\nHelps avoid command spam when files change rapidly (e.g., during saves)\nSet to 0 to disable debouncing. Default: 100ms"
+    )]
+    debounce: u64,
+
     /// Command to execute when files are created
     #[arg(long, value_name = "COMMAND", help_heading = COMMANDS_HELP)]
     #[arg(
@@ -87,6 +94,7 @@ fn create_watcher_from_args(args: Args) -> anyhow::Result<watcher::FileWatcher> 
             on_delete: args.on_delete,
             on_change: args.on_change,
         },
+        args.debounce,
     )
 }
 
@@ -339,6 +347,7 @@ mod tests {
             exclude: vec![],
             include: vec![],
             verbose: false,
+            debounce: 0,
             on_create: None,
             on_modify: None,
             on_delete: None,
@@ -359,6 +368,7 @@ mod tests {
             exclude: vec!["*.tmp".to_string()],
             include: vec!["*.rs".to_string()],
             verbose: true,
+            debounce: 100,
             on_create: Some("echo created".to_string()),
             on_modify: Some("echo modified".to_string()),
             on_delete: Some("echo deleted".to_string()),
@@ -376,6 +386,7 @@ mod tests {
             exclude: vec![],
             include: vec![],
             verbose: false,
+            debounce: 0,
             on_create: None,
             on_modify: None,
             on_delete: None,
@@ -396,6 +407,7 @@ mod tests {
             exclude: vec![],
             include: vec!["[invalid".to_string()],
             verbose: false,
+            debounce: 0,
             on_create: None,
             on_modify: None,
             on_delete: None,

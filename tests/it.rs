@@ -578,6 +578,8 @@ fn test_specific_event_commands() {
     let mut child = StdCommand::cargo_bin("vibewatch")
         .unwrap()
         .arg(temp_dir.path())
+        .arg("--debounce")
+        .arg("0") // Disable debouncing for immediate test response
         .arg("--on-create")
         .arg(&create_cmd)
         .arg("--on-modify")

@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
 
 use crate::filter::PatternFilter;
@@ -79,6 +80,7 @@ pub struct FileWatcher {
     watch_path: PathBuf,
     filter: PatternFilter,
     command_config: CommandConfig,
+    debounce_ms: u64,
 }
 
 impl FileWatcher {
@@ -88,6 +90,7 @@ impl FileWatcher {
         include_patterns: Vec<String>,
         exclude_patterns: Vec<String>,
         command_config: CommandConfig,
+        debounce_ms: u64,
     ) -> Result<Self> {
         // Ensure the watch path exists
         if !watch_path.exists() {
@@ -109,6 +112,7 @@ impl FileWatcher {
             watch_path,
             filter,
             command_config,
+            debounce_ms,
         })
     }
 
@@ -134,19 +138,57 @@ impl FileWatcher {
             .context("Failed to start watching directory")?;
 
         log::info!("File watcher started successfully");
+        if self.debounce_ms > 0 {
+            log::info!("Debouncing enabled: {}ms", self.debounce_ms);
+        }
         println!("🚀 Watching for file changes... Press Ctrl+C to stop");
 
-        // Process events in main thread
+        // Track pending events for debouncing: path -> (event, last_update_time)
+        let mut pending_events: HashMap<PathBuf, (Event, Instant)> = HashMap::new();
+        let debounce_duration = Duration::from_millis(self.debounce_ms);
+
+        // Process events in main thread with debouncing
         loop {
-            match rx.recv_timeout(Duration::from_secs(1)) {
+            // Calculate timeout: either 100ms for checking pending events or remaining debounce time
+            let timeout = if pending_events.is_empty() {
+                Duration::from_secs(1)
+            } else {
+                Duration::from_millis(50) // Check more frequently when events are pending
+            };
+
+            match rx.recv_timeout(timeout) {
                 Ok(Ok(event)) => {
-                    self.handle_event(event);
+                    if self.debounce_ms == 0 {
+                        // No debouncing - process immediately
+                        self.handle_event(event);
+                    } else {
+                        // Debouncing enabled - track events
+                        for path in &event.paths {
+                            pending_events.insert(path.clone(), (event.clone(), Instant::now()));
+                            log::debug!("Debouncing event for: {}", path.display());
+                        }
+                    }
                 }
                 Ok(Err(e)) => {
                     log::error!("Watch error: {}", e);
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
-                    // No event received within timeout, continue
+                    // Check for events that have exceeded debounce period
+                    if self.debounce_ms > 0 {
+                        let now = Instant::now();
+                        let ready_paths: Vec<PathBuf> = pending_events
+                            .iter()
+                            .filter(|(_, (_, time))| now.duration_since(*time) >= debounce_duration)
+                            .map(|(path, _)| path.clone())
+                            .collect();
+
+                        for path in ready_paths {
+                            if let Some((event, _)) = pending_events.remove(&path) {
+                                log::debug!("Debounce period elapsed for: {}", path.display());
+                                self.handle_event(event);
+                            }
+                        }
+                    }
                     continue;
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -535,7 +577,7 @@ mod tests {
             on_change: None,
         };
 
-        let result = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config);
+        let result = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0);
         assert!(result.is_ok());
     }
 
@@ -553,6 +595,7 @@ mod tests {
             vec![],
             vec![],
             config,
+            0,
         );
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -572,7 +615,7 @@ mod tests {
             on_change: None,
         };
 
-        let result = FileWatcher::new(file_path, vec![], vec![], config);
+        let result = FileWatcher::new(file_path, vec![], vec![], config, 0);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("Path is not a directory"));
@@ -593,6 +636,7 @@ mod tests {
             vec!["[invalid".to_string()],
             vec![],
             config,
+            0,
         );
         assert!(result.is_err());
     }
@@ -612,6 +656,7 @@ mod tests {
             vec![],
             vec!["[invalid".to_string()],
             config,
+            0,
         );
         assert!(result.is_err());
     }
@@ -690,7 +735,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // Use canonicalized path since FileWatcher stores canonicalized paths
         let file_path = temp_dir.path().canonicalize().unwrap().join("test.txt");
@@ -710,7 +755,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // Use canonicalized path since FileWatcher stores canonicalized paths
         let file_path = temp_dir
@@ -735,7 +780,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // Try with a path outside the watch directory
         let outside_path = PathBuf::from("/tmp/outside.txt");
@@ -889,6 +934,7 @@ mod tests {
             vec!["*.rs".to_string()],
             vec!["target/**".to_string()],
             config,
+            0,
         );
 
         assert!(watcher.is_ok());
@@ -942,7 +988,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // Create a test file
         let test_file = temp_dir.path().join("test.txt");
@@ -976,6 +1022,7 @@ mod tests {
             vec!["*.rs".to_string()],
             vec![],
             config,
+            0,
         )
         .unwrap();
 
@@ -1006,7 +1053,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1034,7 +1081,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1060,7 +1107,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // Use a path that doesn't exist
         let nonexistent_file = temp_dir
@@ -1091,7 +1138,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         let test_file = temp_dir.path().join("new.txt");
         fs::write(&test_file, "new").unwrap();
@@ -1116,7 +1163,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         // For delete events, file doesn't exist
         let deleted_file = temp_dir.path().canonicalize().unwrap().join("deleted.txt");
@@ -1159,7 +1206,7 @@ mod tests {
         };
 
         let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1190,7 +1237,7 @@ mod tests {
             on_change: Some("echo test".to_string()),
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config);
+        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0);
         assert!(watcher.is_ok());
 
         // The watcher is valid and could start_watching if we called it
