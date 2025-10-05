@@ -65,12 +65,59 @@ impl TemplateContext {
     }
 
     /// Substitute template variables in a command string
+    /// 
+    /// Uses a single-pass algorithm with pre-allocated capacity for better performance.
+    /// Supports: {file_path}, {relative_path}, {event_type}, {absolute_path}
     pub fn substitute_template(&self, template: &str) -> String {
-        template
-            .replace("{file_path}", &self.file_path)
-            .replace("{relative_path}", &self.relative_path)
-            .replace("{event_type}", &self.event_type)
-            .replace("{absolute_path}", &self.absolute_path)
+        // Pre-allocate with template size + estimated expansion (128 bytes for paths)
+        let mut result = String::with_capacity(template.len() + 128);
+        let mut last_end = 0;
+        
+        // Single pass through template looking for placeholders
+        let bytes = template.as_bytes();
+        let mut i = 0;
+        
+        while i < bytes.len() {
+            if bytes[i] == b'{' {
+                // Found potential placeholder start
+                // Append literal text before placeholder
+                result.push_str(&template[last_end..i]);
+                
+                // Find closing brace
+                if let Some(end) = template[i..].find('}') {
+                    let placeholder_end = i + end;
+                    let placeholder = &template[i + 1..placeholder_end];
+                    
+                    // Match and substitute placeholder
+                    match placeholder {
+                        "file_path" => result.push_str(&self.file_path),
+                        "relative_path" => result.push_str(&self.relative_path),
+                        "event_type" => result.push_str(self.event_type),
+                        "absolute_path" => result.push_str(&self.absolute_path),
+                        _ => {
+                            // Unknown placeholder - keep as-is
+                            result.push('{');
+                            result.push_str(placeholder);
+                            result.push('}');
+                        }
+                    }
+                    
+                    last_end = placeholder_end + 1;
+                    i = placeholder_end + 1;
+                } else {
+                    // No closing brace - keep the opening brace
+                    result.push('{');
+                    last_end = i + 1;
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        
+        // Append remaining literal text
+        result.push_str(&template[last_end..]);
+        result
     }
 }
 
