@@ -187,7 +187,7 @@ impl FileWatcher {
                 };
 
                 Self::log_file_change(&relative_path, final_event_kind);
-                
+
                 // Execute command if configured
                 self.execute_command_for_event(&path, &relative_path, final_event_kind);
             }
@@ -219,19 +219,25 @@ impl FileWatcher {
         if let Some(command_template) = self.command_config.get_command_for_event(event_kind) {
             let context = TemplateContext::new(path, relative_path, event_kind, &self.watch_path);
             let command = context.substitute_template(command_template);
-            
+
             log::info!("Executing command: {}", command);
-            
+
             // Execute command asynchronously
             tokio::spawn(async move {
                 match Self::execute_shell_command(&command).await {
                     Ok(output) => {
                         log::debug!("Command executed successfully");
                         if !output.stdout.is_empty() {
-                            log::debug!("Command stdout: {}", String::from_utf8_lossy(&output.stdout));
+                            log::debug!(
+                                "Command stdout: {}",
+                                String::from_utf8_lossy(&output.stdout)
+                            );
                         }
                         if !output.stderr.is_empty() {
-                            log::warn!("Command stderr: {}", String::from_utf8_lossy(&output.stderr));
+                            log::warn!(
+                                "Command stderr: {}",
+                                String::from_utf8_lossy(&output.stderr)
+                            );
                         }
                     }
                     Err(e) => {
@@ -245,7 +251,7 @@ impl FileWatcher {
     /// Execute a shell command asynchronously
     async fn execute_shell_command(command: &str) -> Result<std::process::Output> {
         log::debug!("Executing shell command: {}", command);
-        
+
         // Split command into program and args (simple parsing)
         let parts: Vec<&str> = command.split_whitespace().collect();
         if parts.is_empty() {
@@ -262,10 +268,7 @@ impl FileWatcher {
             .context("Failed to execute command")?;
 
         if !output.status.success() {
-            anyhow::bail!(
-                "Command failed with exit code: {:?}",
-                output.status.code()
-            );
+            anyhow::bail!("Command failed with exit code: {:?}", output.status.code());
         }
 
         Ok(output)
@@ -283,24 +286,101 @@ mod tests {
     // Parameterized tests for CommandConfig - testing command resolution for different event types
     #[rstest]
     // Create event tests
-    #[case(Some("create_cmd"), None, None, Some("fallback"), EventKind::Create(CreateKind::File), Some("create_cmd"))]
-    #[case(None, None, None, Some("fallback"), EventKind::Create(CreateKind::File), Some("fallback"))]
-    #[case(Some("create_cmd"), None, None, None, EventKind::Create(CreateKind::Folder), Some("create_cmd"))]
+    #[case(
+        Some("create_cmd"),
+        None,
+        None,
+        Some("fallback"),
+        EventKind::Create(CreateKind::File),
+        Some("create_cmd")
+    )]
+    #[case(
+        None,
+        None,
+        None,
+        Some("fallback"),
+        EventKind::Create(CreateKind::File),
+        Some("fallback")
+    )]
+    #[case(
+        Some("create_cmd"),
+        None,
+        None,
+        None,
+        EventKind::Create(CreateKind::Folder),
+        Some("create_cmd")
+    )]
     // Modify event tests
-    #[case(None, Some("modify_cmd"), None, Some("fallback"), EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)), Some("modify_cmd"))]
-    #[case(None, None, None, Some("fallback"), EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)), Some("fallback"))]
-    #[case(None, Some("modify_cmd"), None, None, EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)), Some("modify_cmd"))]
+    #[case(
+        None,
+        Some("modify_cmd"),
+        None,
+        Some("fallback"),
+        EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        Some("modify_cmd")
+    )]
+    #[case(
+        None,
+        None,
+        None,
+        Some("fallback"),
+        EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        Some("fallback")
+    )]
+    #[case(
+        None,
+        Some("modify_cmd"),
+        None,
+        None,
+        EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)),
+        Some("modify_cmd")
+    )]
     // Delete event tests
-    #[case(None, None, Some("delete_cmd"), Some("fallback"), EventKind::Remove(RemoveKind::File), Some("delete_cmd"))]
-    #[case(None, None, None, Some("fallback"), EventKind::Remove(RemoveKind::File), Some("fallback"))]
-    #[case(None, None, Some("delete_cmd"), None, EventKind::Remove(RemoveKind::Folder), Some("delete_cmd"))]
+    #[case(
+        None,
+        None,
+        Some("delete_cmd"),
+        Some("fallback"),
+        EventKind::Remove(RemoveKind::File),
+        Some("delete_cmd")
+    )]
+    #[case(
+        None,
+        None,
+        None,
+        Some("fallback"),
+        EventKind::Remove(RemoveKind::File),
+        Some("fallback")
+    )]
+    #[case(
+        None,
+        None,
+        Some("delete_cmd"),
+        None,
+        EventKind::Remove(RemoveKind::Folder),
+        Some("delete_cmd")
+    )]
     // No command configured
     #[case(None, None, None, None, EventKind::Create(CreateKind::File), None)]
     #[case(None, None, None, None, EventKind::Modify(ModifyKind::Any), None)]
     #[case(None, None, None, None, EventKind::Remove(RemoveKind::File), None)]
     // Other event types use fallback
-    #[case(Some("create_cmd"), None, None, Some("fallback"), EventKind::Access(notify::event::AccessKind::Any), Some("fallback"))]
-    #[case(None, Some("modify_cmd"), None, Some("fallback"), EventKind::Any, Some("fallback"))]
+    #[case(
+        Some("create_cmd"),
+        None,
+        None,
+        Some("fallback"),
+        EventKind::Access(notify::event::AccessKind::Any),
+        Some("fallback")
+    )]
+    #[case(
+        None,
+        Some("modify_cmd"),
+        None,
+        Some("fallback"),
+        EventKind::Any,
+        Some("fallback")
+    )]
     fn test_command_config_resolution(
         #[case] on_create: Option<&str>,
         #[case] on_modify: Option<&str>,
@@ -315,23 +395,52 @@ mod tests {
             on_delete: on_delete.map(|s| s.to_string()),
             on_change: on_change.map(|s| s.to_string()),
         };
-        
+
         let result = config.get_command_for_event(&event);
         let expected_str = expected.map(|s| s.to_string());
         assert_eq!(
             result,
             expected_str.as_ref(),
             "Config({:?}, {:?}, {:?}, {:?}) with event {:?} should return {:?}",
-            on_create, on_modify, on_delete, on_change, event, expected
+            on_create,
+            on_modify,
+            on_delete,
+            on_change,
+            event,
+            expected
         );
     }
 
     // Test TemplateContext with parameterized event types
     #[rstest]
-    #[case("/tmp/test/src/main.rs", "src/main.rs", EventKind::Create(CreateKind::File), "create", "/tmp/test/src/main.rs")]
-    #[case("/tmp/test/file.txt", "file.txt", EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)), "modify", "/tmp/test/file.txt")]
-    #[case("/tmp/test/file.txt", "file.txt", EventKind::Remove(RemoveKind::File), "delete", "/tmp/test/file.txt")]
-    #[case("/tmp/test/file.txt", "file.txt", EventKind::Access(notify::event::AccessKind::Any), "change", "/tmp/test/file.txt")]
+    #[case(
+        "/tmp/test/src/main.rs",
+        "src/main.rs",
+        EventKind::Create(CreateKind::File),
+        "create",
+        "/tmp/test/src/main.rs"
+    )]
+    #[case(
+        "/tmp/test/file.txt",
+        "file.txt",
+        EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        "modify",
+        "/tmp/test/file.txt"
+    )]
+    #[case(
+        "/tmp/test/file.txt",
+        "file.txt",
+        EventKind::Remove(RemoveKind::File),
+        "delete",
+        "/tmp/test/file.txt"
+    )]
+    #[case(
+        "/tmp/test/file.txt",
+        "file.txt",
+        EventKind::Access(notify::event::AccessKind::Any),
+        "change",
+        "/tmp/test/file.txt"
+    )]
     fn test_template_context_event_types(
         #[case] file_path_str: &str,
         #[case] relative_path_str: &str,
@@ -579,12 +688,13 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // Use canonicalized path since FileWatcher stores canonicalized paths
         let file_path = temp_dir.path().canonicalize().unwrap().join("test.txt");
         let relative = watcher.get_relative_path(&file_path);
-        
+
         assert_eq!(relative, Some(PathBuf::from("test.txt")));
     }
 
@@ -598,12 +708,18 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // Use canonicalized path since FileWatcher stores canonicalized paths
-        let file_path = temp_dir.path().canonicalize().unwrap().join("src").join("main.rs");
+        let file_path = temp_dir
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("src")
+            .join("main.rs");
         let relative = watcher.get_relative_path(&file_path);
-        
+
         assert_eq!(relative, Some(PathBuf::from("src/main.rs")));
     }
 
@@ -617,28 +733,83 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // Try with a path outside the watch directory
         let outside_path = PathBuf::from("/tmp/outside.txt");
         let relative = watcher.get_relative_path(&outside_path);
-        
+
         assert_eq!(relative, None);
     }
 
     #[rstest]
     // Create kind variants
-    #[case("create", EventKind::Create(CreateKind::File), Some("create"), None, None)]
-    #[case("create", EventKind::Create(CreateKind::Folder), Some("create"), None, None)]
-    #[case("create", EventKind::Create(CreateKind::Any), Some("create"), None, None)]
+    #[case(
+        "create",
+        EventKind::Create(CreateKind::File),
+        Some("create"),
+        None,
+        None
+    )]
+    #[case(
+        "create",
+        EventKind::Create(CreateKind::Folder),
+        Some("create"),
+        None,
+        None
+    )]
+    #[case(
+        "create",
+        EventKind::Create(CreateKind::Any),
+        Some("create"),
+        None,
+        None
+    )]
     // Modify kind variants
-    #[case("modify", EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)), None, Some("modify"), None)]
-    #[case("modify", EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)), None, Some("modify"), None)]
-    #[case("modify", EventKind::Modify(ModifyKind::Any), None, Some("modify"), None)]
+    #[case(
+        "modify",
+        EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        None,
+        Some("modify"),
+        None
+    )]
+    #[case(
+        "modify",
+        EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)),
+        None,
+        Some("modify"),
+        None
+    )]
+    #[case(
+        "modify",
+        EventKind::Modify(ModifyKind::Any),
+        None,
+        Some("modify"),
+        None
+    )]
     // Remove kind variants
-    #[case("delete", EventKind::Remove(RemoveKind::File), None, None, Some("delete"))]
-    #[case("delete", EventKind::Remove(RemoveKind::Folder), None, None, Some("delete"))]
-    #[case("delete", EventKind::Remove(RemoveKind::Any), None, None, Some("delete"))]
+    #[case(
+        "delete",
+        EventKind::Remove(RemoveKind::File),
+        None,
+        None,
+        Some("delete")
+    )]
+    #[case(
+        "delete",
+        EventKind::Remove(RemoveKind::Folder),
+        None,
+        None,
+        Some("delete")
+    )]
+    #[case(
+        "delete",
+        EventKind::Remove(RemoveKind::Any),
+        None,
+        None,
+        Some("delete")
+    )]
     fn test_command_config_all_event_kind_variants(
         #[case] expected_cmd: &str,
         #[case] event: EventKind,
@@ -673,7 +844,10 @@ mod tests {
 
         assert_eq!(ctx.file_path, "/home/user/project/src/deep/nested/file.rs");
         assert_eq!(ctx.relative_path, "src/deep/nested/file.rs");
-        assert_eq!(ctx.absolute_path, "/home/user/project/src/deep/nested/file.rs");
+        assert_eq!(
+            ctx.absolute_path,
+            "/home/user/project/src/deep/nested/file.rs"
+        );
     }
 
     #[test]
@@ -715,7 +889,7 @@ mod tests {
             vec!["target/**".to_string()],
             config,
         );
-        
+
         assert!(watcher.is_ok());
     }
 
@@ -734,15 +908,18 @@ mod tests {
     #[case(EventKind::Create(CreateKind::Folder), "create")]
     #[case(EventKind::Create(CreateKind::Any), "create")]
     #[case(EventKind::Modify(ModifyKind::Any), "modify")]
-    #[case(EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)), "modify")]
-    #[case(EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)), "modify")]
+    #[case(
+        EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)),
+        "modify"
+    )]
+    #[case(
+        EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        "modify"
+    )]
     #[case(EventKind::Remove(RemoveKind::File), "delete")]
     #[case(EventKind::Remove(RemoveKind::Folder), "delete")]
     #[case(EventKind::Remove(RemoveKind::Any), "delete")]
-    fn test_event_kind_to_string_conversion(
-        #[case] event_kind: EventKind,
-        #[case] expected: &str,
-    ) {
+    fn test_event_kind_to_string_conversion(#[case] event_kind: EventKind, #[case] expected: &str) {
         assert_eq!(
             expected,
             TemplateContext::event_kind_to_string(&event_kind),
@@ -763,19 +940,20 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // Create a test file
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
-        
+
         // Create an event
         let event = Event {
             kind: EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
             paths: vec![test_file.canonicalize().unwrap()],
             attrs: Default::default(),
         };
-        
+
         // This should execute without panic
         watcher.handle_event(event);
     }
@@ -799,18 +977,18 @@ mod tests {
             config,
         )
         .unwrap();
-        
+
         // Create a non-matching file
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
-        
+
         // Create an event for non-matching file
         let event = Event {
             kind: EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
             paths: vec![test_file.canonicalize().unwrap()],
             attrs: Default::default(),
         };
-        
+
         // This should not execute command (filtered out)
         watcher.handle_event(event);
     }
@@ -826,18 +1004,19 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
-        
+
         // Create an Access event (should be ignored)
         let event = Event {
             kind: EventKind::Access(notify::event::AccessKind::Any),
             paths: vec![test_file.canonicalize().unwrap()],
             attrs: Default::default(),
         };
-        
+
         // This should return early without processing
         watcher.handle_event(event);
     }
@@ -853,18 +1032,19 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
-        
+
         // Create a ModifyName event with existing file
         let event = Event {
             kind: EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)),
             paths: vec![test_file.canonicalize().unwrap()],
             attrs: Default::default(),
         };
-        
+
         watcher.handle_event(event);
     }
 
@@ -878,18 +1058,23 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // Use a path that doesn't exist
-        let nonexistent_file = temp_dir.path().canonicalize().unwrap().join("nonexistent.txt");
-        
+        let nonexistent_file = temp_dir
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("nonexistent.txt");
+
         // Create a ModifyName event (will be treated as delete since file doesn't exist)
         let event = Event {
             kind: EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Any)),
             paths: vec![nonexistent_file],
             attrs: Default::default(),
         };
-        
+
         watcher.handle_event(event);
     }
 
@@ -904,17 +1089,18 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         let test_file = temp_dir.path().join("new.txt");
         fs::write(&test_file, "new").unwrap();
-        
+
         let event = Event {
             kind: EventKind::Create(CreateKind::File),
             paths: vec![test_file.canonicalize().unwrap()],
             attrs: Default::default(),
         };
-        
+
         watcher.handle_event(event);
     }
 
@@ -928,29 +1114,36 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         // For delete events, file doesn't exist
         let deleted_file = temp_dir.path().canonicalize().unwrap().join("deleted.txt");
-        
+
         let event = Event {
             kind: EventKind::Remove(RemoveKind::File),
             paths: vec![deleted_file],
             attrs: Default::default(),
         };
-        
+
         watcher.handle_event(event);
     }
 
     #[test]
     fn test_log_file_change_coverage() {
         use std::path::Path;
-        
+
         // Test all event types for log coverage
         FileWatcher::log_file_change(Path::new("test.txt"), &EventKind::Create(CreateKind::File));
-        FileWatcher::log_file_change(Path::new("test.txt"), &EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)));
+        FileWatcher::log_file_change(
+            Path::new("test.txt"),
+            &EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Any)),
+        );
         FileWatcher::log_file_change(Path::new("test.txt"), &EventKind::Remove(RemoveKind::File));
-        FileWatcher::log_file_change(Path::new("test.txt"), &EventKind::Access(notify::event::AccessKind::Any));
+        FileWatcher::log_file_change(
+            Path::new("test.txt"),
+            &EventKind::Access(notify::event::AccessKind::Any),
+        );
     }
 
     #[test]
@@ -964,12 +1157,13 @@ mod tests {
             on_change: None,
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
-        
+        let watcher =
+            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config).unwrap();
+
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
         let canonical = test_file.canonicalize().unwrap();
-        
+
         // Should not panic when no command is configured
         watcher.execute_command_for_event(
             &canonical,
@@ -983,11 +1177,11 @@ mod tests {
         // Test that start_watching can be called and initializes properly
         // We can't test the full event loop without it blocking, but we can
         // verify the watcher setup works by checking error cases
-        
+
         // This test verifies the watcher creation and initial setup
         // The actual event loop is covered by integration testing
         let temp_dir = TempDir::new().unwrap();
-        
+
         let config = CommandConfig {
             on_create: None,
             on_modify: None,
@@ -997,7 +1191,7 @@ mod tests {
 
         let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config);
         assert!(watcher.is_ok());
-        
+
         // The watcher is valid and could start_watching if we called it
         // But we don't call it in the test because it would block
     }
@@ -1007,12 +1201,12 @@ mod tests {
         // This test covers the error path in the watcher callback
         // when the channel receiver is dropped
         use std::sync::mpsc;
-        
+
         let (tx, rx): (mpsc::Sender<Result<Event, notify::Error>>, _) = mpsc::channel();
-        
+
         // Drop the receiver immediately
         drop(rx);
-        
+
         // Now sending should fail
         let result = tx.send(Ok(Event::new(EventKind::Any)));
         assert!(result.is_err());

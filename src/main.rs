@@ -20,42 +20,58 @@ const GENERAL_HELP: &str = "General Options";
 struct Args {
     /// Root directory to watch for file changes (recursively)
     #[arg(value_name = "DIRECTORY")]
-    #[arg(help = "Path to directory to monitor. Can be relative (e.g., '.', 'src') or absolute. Watches all subdirectories recursively")]
+    #[arg(
+        help = "Path to directory to monitor. Can be relative (e.g., '.', 'src') or absolute. Watches all subdirectories recursively"
+    )]
     directory: PathBuf,
 
     /// Exclude patterns (glob patterns to ignore)
     #[arg(short, long, value_name = "PATTERN", help_heading = FILTERING_HELP)]
-    #[arg(help = "Exclude files/directories matching these glob patterns\n\nExamples: 'node_modules/**', '.git/**', 'target/**', '*.tmp'\nCan be used multiple times to exclude different patterns")]
+    #[arg(
+        help = "Exclude files/directories matching these glob patterns\n\nExamples: 'node_modules/**', '.git/**', 'target/**', '*.tmp'\nCan be used multiple times to exclude different patterns"
+    )]
     exclude: Vec<String>,
 
     /// Include patterns (glob patterns to watch)
     #[arg(short, long, value_name = "PATTERN", help_heading = FILTERING_HELP)]
-    #[arg(help = "Only watch files matching these glob patterns\n\nExamples: '*.rs', '**/*.js', 'src/**/*.{ts,tsx}', '*.{md,txt}'\nIf not specified, watches all files. Can be used multiple times")]
+    #[arg(
+        help = "Only watch files matching these glob patterns\n\nExamples: '*.rs', '**/*.js', 'src/**/*.{ts,tsx}', '*.{md,txt}'\nIf not specified, watches all files. Can be used multiple times"
+    )]
     include: Vec<String>,
 
     /// Enable verbose logging output
     #[arg(short, long, help_heading = GENERAL_HELP)]
-    #[arg(help = "Show detailed debug information about file events, pattern matching, and command execution")]
+    #[arg(
+        help = "Show detailed debug information about file events, pattern matching, and command execution"
+    )]
     verbose: bool,
 
     /// Command to execute when files are created
     #[arg(long, value_name = "COMMAND", help_heading = COMMANDS_HELP)]
-    #[arg(help = "Run this command when NEW files are created\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-create 'git add {file_path}'")]
+    #[arg(
+        help = "Run this command when NEW files are created\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-create 'git add {file_path}'"
+    )]
     on_create: Option<String>,
 
     /// Command to execute when files are modified
     #[arg(long, value_name = "COMMAND", help_heading = COMMANDS_HELP)]
-    #[arg(help = "Run this command when EXISTING files are modified/updated\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-modify 'npx eslint {file_path} --fix'")]
+    #[arg(
+        help = "Run this command when EXISTING files are modified/updated\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-modify 'npx eslint {file_path} --fix'"
+    )]
     on_modify: Option<String>,
 
     /// Command to execute when files are deleted
     #[arg(long, value_name = "COMMAND", help_heading = COMMANDS_HELP)]
-    #[arg(help = "Run this command when files are DELETED/removed\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-delete 'echo File {relative_path} was removed'")]
+    #[arg(
+        help = "Run this command when files are DELETED/removed\n\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-delete 'echo File {relative_path} was removed'"
+    )]
     on_delete: Option<String>,
 
     /// Command to execute on ANY file change (fallback for all events)
     #[arg(long, value_name = "COMMAND", help_heading = COMMANDS_HELP)]
-    #[arg(help = "Run this command for ANY file event (create/modify/delete)\n\nActs as fallback when specific --on-* commands are not set\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-change 'echo {event_type}: {relative_path}'")]
+    #[arg(
+        help = "Run this command for ANY file event (create/modify/delete)\n\nActs as fallback when specific --on-* commands are not set\nTemplates: {file_path}, {relative_path}, {absolute_path}, {event_type}\nExample: --on-change 'echo {event_type}: {relative_path}'"
+    )]
     on_change: Option<String>,
 }
 
@@ -121,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_args_basic_directory() {
-        let args = Args::parse_from(&["vibewatch", "."]);
+        let args = Args::parse_from(["vibewatch", "."]);
         assert_eq!(args.directory, PathBuf::from("."));
         assert!(args.exclude.is_empty());
         assert!(args.include.is_empty());
@@ -130,14 +146,15 @@ mod tests {
 
     #[test]
     fn test_args_with_include_patterns() {
-        let args = Args::parse_from(&["vibewatch", ".", "--include", "*.rs", "--include", "*.toml"]);
+        let args =
+            Args::parse_from(["vibewatch", ".", "--include", "*.rs", "--include", "*.toml"]);
         assert_eq!(args.directory, PathBuf::from("."));
         assert_eq!(args.include, vec!["*.rs", "*.toml"]);
     }
 
     #[test]
     fn test_args_with_exclude_patterns() {
-        let args = Args::parse_from(&[
+        let args = Args::parse_from([
             "vibewatch",
             ".",
             "--exclude",
@@ -150,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_args_with_verbose() {
-        let args = Args::parse_from(&["vibewatch", ".", "--verbose"]);
+        let args = Args::parse_from(["vibewatch", ".", "--verbose"]);
         assert!(args.verbose);
     }
 
@@ -165,9 +182,9 @@ mod tests {
         #[case] command: &str,
         #[case] field_name: &str,
     ) {
-        let args = Args::parse_from(&["vibewatch", ".", flag, command]);
+        let args = Args::parse_from(["vibewatch", ".", flag, command]);
         let expected = Some(command.to_string());
-        
+
         let actual = match field_name {
             "on_create" => &args.on_create,
             "on_modify" => &args.on_modify,
@@ -175,19 +192,17 @@ mod tests {
             "on_change" => &args.on_change,
             _ => panic!("Unknown field: {}", field_name),
         };
-        
+
         assert_eq!(
-            actual,
-            &expected,
+            actual, &expected,
             "Flag {} with command '{}' should be parsed correctly",
-            flag,
-            command
+            flag, command
         );
     }
 
     #[test]
     fn test_args_all_options_combined() {
-        let args = Args::parse_from(&[
+        let args = Args::parse_from([
             "vibewatch",
             "/tmp/watch",
             "--include",
@@ -217,15 +232,7 @@ mod tests {
 
     #[test]
     fn test_args_short_flags() {
-        let args = Args::parse_from(&[
-            "vibewatch",
-            ".",
-            "-i",
-            "*.rs",
-            "-e",
-            "target/**",
-            "-v",
-        ]);
+        let args = Args::parse_from(["vibewatch", ".", "-i", "*.rs", "-e", "target/**", "-v"]);
 
         assert_eq!(args.include, vec!["*.rs"]);
         assert_eq!(args.exclude, vec!["target/**"]);
@@ -234,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_args_multiple_include_exclude() {
-        let args = Args::parse_from(&[
+        let args = Args::parse_from([
             "vibewatch",
             ".",
             "-i",
@@ -252,7 +259,10 @@ mod tests {
         ]);
 
         assert_eq!(args.include, vec!["*.rs", "*.toml", "*.md"]);
-        assert_eq!(args.exclude, vec!["target/**", ".git/**", "node_modules/**"]);
+        assert_eq!(
+            args.exclude,
+            vec!["target/**", ".git/**", "node_modules/**"]
+        );
     }
 
     #[rstest]
@@ -260,11 +270,8 @@ mod tests {
     #[case("/tmp/test", "/tmp/test")]
     #[case(".", ".")]
     #[case("./target", "./target")]
-    fn test_args_directory_paths(
-        #[case] path: &str,
-        #[case] expected: &str,
-    ) {
-        let args = Args::parse_from(&["vibewatch", path]);
+    fn test_args_directory_paths(#[case] path: &str, #[case] expected: &str) {
+        let args = Args::parse_from(["vibewatch", path]);
         assert_eq!(
             args.directory,
             PathBuf::from(expected),
@@ -275,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_args_no_commands() {
-        let args = Args::parse_from(&["vibewatch", "."]);
+        let args = Args::parse_from(["vibewatch", "."]);
         assert_eq!(args.on_create, None);
         assert_eq!(args.on_modify, None);
         assert_eq!(args.on_delete, None);
@@ -284,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_args_command_with_template_variables() {
-        let args = Args::parse_from(&[
+        let args = Args::parse_from([
             "vibewatch",
             ".",
             "--on-modify",
@@ -298,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_args_command_with_quotes() {
-        let args = Args::parse_from(&[
+        let args = Args::parse_from([
             "vibewatch",
             ".",
             "--on-change",
@@ -312,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_args_minimal() {
-        let args = Args::parse_from(&["vibewatch", "."]);
+        let args = Args::parse_from(["vibewatch", "."]);
         assert_eq!(args.directory, PathBuf::from("."));
         assert!(args.include.is_empty());
         assert!(args.exclude.is_empty());
@@ -326,7 +333,7 @@ mod tests {
     #[test]
     fn test_create_watcher_from_args_valid() {
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let args = Args {
             directory: temp_dir.path().to_path_buf(),
@@ -346,7 +353,7 @@ mod tests {
     #[test]
     fn test_create_watcher_from_args_with_patterns() {
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let args = Args {
             directory: temp_dir.path().to_path_buf(),
@@ -383,7 +390,7 @@ mod tests {
     #[test]
     fn test_create_watcher_from_args_invalid_patterns() {
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let args = Args {
             directory: temp_dir.path().to_path_buf(),
@@ -408,9 +415,8 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .is_test(true)
             .try_init();
-        
-        // If we get here, initialization succeeded
-        assert!(true);
+
+        // If we get here, initialization succeeded (test passes)
     }
 
     #[test]
@@ -420,37 +426,36 @@ mod tests {
             .filter_level(log::LevelFilter::Info)
             .is_test(true)
             .try_init();
-        
-        // If we get here, initialization succeeded
-        assert!(true);
+
+        // If we get here, initialization succeeded (test passes)
     }
 
     #[test]
     fn test_log_statements_coverage() {
         use tempfile::TempDir;
-        
+
         // This test ensures log statements are executed
         let _ = env_logger::Builder::from_default_env()
             .filter_level(log::LevelFilter::Debug)
             .is_test(true)
             .try_init();
-        
+
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Simulate what main() does with logging
         log::info!("Starting vibewatch file watcher");
         log::info!("Watching directory: {}", temp_dir.path().display());
-        
+
         let exclude_patterns = vec!["*.tmp".to_string()];
         if !exclude_patterns.is_empty() {
             log::info!("Exclude patterns: {:?}", exclude_patterns);
         }
-        
+
         let include_patterns = vec!["*.rs".to_string()];
         if !include_patterns.is_empty() {
             log::info!("Include patterns: {:?}", include_patterns);
         }
-        
-        assert!(true);
+
+        // Test passes if we reach here without panicking
     }
 }

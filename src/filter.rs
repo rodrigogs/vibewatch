@@ -272,11 +272,8 @@ mod tests {
 
     #[test]
     fn test_empty_include_with_excludes() {
-        let filter = PatternFilter::new(
-            vec![],
-            vec!["*.tmp".to_string(), "*.bak".to_string()],
-        )
-        .unwrap();
+        let filter =
+            PatternFilter::new(vec![], vec!["*.tmp".to_string(), "*.bak".to_string()]).unwrap();
 
         assert!(filter.should_watch(&PathBuf::from("main.rs")));
         assert!(!filter.should_watch(&PathBuf::from("file.tmp")));
@@ -286,11 +283,7 @@ mod tests {
     #[test]
     fn test_multiple_include_patterns() {
         let filter = PatternFilter::new(
-            vec![
-                "*.rs".to_string(),
-                "*.toml".to_string(),
-                "*.md".to_string(),
-            ],
+            vec!["*.rs".to_string(), "*.toml".to_string(), "*.md".to_string()],
             vec![],
         )
         .unwrap();
@@ -303,11 +296,7 @@ mod tests {
 
     #[test]
     fn test_pattern_with_directory_separator() {
-        let filter = PatternFilter::new(
-            vec!["src/*.rs".to_string()],
-            vec![],
-        )
-        .unwrap();
+        let filter = PatternFilter::new(vec!["src/*.rs".to_string()], vec![]).unwrap();
 
         assert!(filter.should_watch(&PathBuf::from("src/main.rs")));
         assert!(filter.should_watch(&PathBuf::from("src/lib.rs")));
@@ -317,11 +306,7 @@ mod tests {
 
     #[test]
     fn test_double_star_pattern() {
-        let filter = PatternFilter::new(
-            vec!["**/test/**/*.rs".to_string()],
-            vec![],
-        )
-        .unwrap();
+        let filter = PatternFilter::new(vec!["**/test/**/*.rs".to_string()], vec![]).unwrap();
 
         assert!(filter.should_watch(&PathBuf::from("test/unit/test.rs")));
         assert!(filter.should_watch(&PathBuf::from("src/test/integration/test.rs")));
@@ -344,17 +329,10 @@ mod tests {
         assert!(result.is_err());
     }
 
-
-
-
-
     #[test]
     fn test_overlapping_patterns() {
-        let filter = PatternFilter::new(
-            vec!["*.rs".to_string(), "src/*.rs".to_string()],
-            vec![],
-        )
-        .unwrap();
+        let filter =
+            PatternFilter::new(vec!["*.rs".to_string(), "src/*.rs".to_string()], vec![]).unwrap();
 
         // Both patterns match, should still work
         assert!(filter.should_watch(&PathBuf::from("main.rs")));
