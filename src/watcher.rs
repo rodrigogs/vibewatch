@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
+use tokio::sync::mpsc;
 
 use crate::filter::PatternFilter;
 
@@ -117,8 +117,8 @@ impl FileWatcher {
     }
 
     /// Start watching for file changes
-    pub fn start_watching(&mut self) -> Result<()> {
-        let (tx, rx) = mpsc::channel();
+    pub async fn start_watching(&mut self) -> Result<()> {
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Create watcher with recommended configuration
         let mut watcher = RecommendedWatcher::new(
@@ -147,34 +147,47 @@ impl FileWatcher {
         let mut pending_events: HashMap<PathBuf, (Event, Instant)> = HashMap::new();
         let debounce_duration = Duration::from_millis(self.debounce_ms);
 
-        // Process events in main thread with debouncing
-        loop {
-            // Calculate timeout: either 100ms for checking pending events or remaining debounce time
-            let timeout = if pending_events.is_empty() {
-                Duration::from_secs(1)
-            } else {
-                Duration::from_millis(50) // Check more frequently when events are pending
-            };
+        // Create ticker for checking pending events
+        let check_interval = if self.debounce_ms > 0 {
+            Duration::from_millis(50) // Check frequently when debouncing enabled
+        } else {
+            Duration::from_secs(3600) // Rarely check when debouncing disabled
+        };
+        let mut ticker = tokio::time::interval(check_interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-            match rx.recv_timeout(timeout) {
-                Ok(Ok(event)) => {
-                    if self.debounce_ms == 0 {
-                        // No debouncing - process immediately
-                        self.handle_event(event);
-                    } else {
-                        // Debouncing enabled - track events
-                        for path in &event.paths {
-                            pending_events.insert(path.clone(), (event.clone(), Instant::now()));
-                            log::debug!("Debouncing event for: {}", path.display());
+        // Process events asynchronously with graceful shutdown
+        loop {
+            tokio::select! {
+                // Handle Ctrl+C for graceful shutdown
+                _ = tokio::signal::ctrl_c() => {
+                    log::info!("Received Ctrl+C, shutting down gracefully...");
+                    println!("\n👋 Shutting down vibewatch...");
+                    break;
+                }
+                // Receive file system events
+                Some(res) = rx.recv() => {
+                    match res {
+                        Ok(event) => {
+                            if self.debounce_ms == 0 {
+                                // No debouncing - process immediately
+                                self.handle_event(event);
+                            } else {
+                                // Debouncing enabled - track events
+                                for path in &event.paths {
+                                    pending_events.insert(path.clone(), (event.clone(), Instant::now()));
+                                    log::debug!("Debouncing event for: {}", path.display());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Watch error: {}", e);
                         }
                     }
                 }
-                Ok(Err(e)) => {
-                    log::error!("Watch error: {}", e);
-                }
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    // Check for events that have exceeded debounce period
-                    if self.debounce_ms > 0 {
+                // Check for events ready to process (exceeded debounce period)
+                _ = ticker.tick() => {
+                    if self.debounce_ms > 0 && !pending_events.is_empty() {
                         let now = Instant::now();
                         let ready_paths: Vec<PathBuf> = pending_events
                             .iter()
@@ -189,11 +202,6 @@ impl FileWatcher {
                             }
                         }
                     }
-                    continue;
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    log::info!("Watcher channel disconnected");
-                    break;
                 }
             }
         }

@@ -126,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create and start the file watcher
     let mut watcher = create_watcher_from_args(args)?;
-    watcher.start_watching()?;
+    watcher.start_watching().await?;
 
     Ok(())
 }
