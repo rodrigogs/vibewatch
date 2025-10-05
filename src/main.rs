@@ -146,8 +146,7 @@ mod tests {
 
     #[test]
     fn test_args_with_include_patterns() {
-        let args =
-            Args::parse_from(["vibewatch", ".", "--include", "*.rs", "--include", "*.toml"]);
+        let args = Args::parse_from(["vibewatch", ".", "--include", "*.rs", "--include", "*.toml"]);
         assert_eq!(args.directory, PathBuf::from("."));
         assert_eq!(args.include, vec!["*.rs", "*.toml"]);
     }
