@@ -45,11 +45,12 @@ impl TemplateContext {
         watch_path: &Path,
     ) -> Self {
         let absolute_path = watch_path.join(relative_path);
+        // Normalize all paths to use forward slashes for cross-platform consistency
         Self {
-            file_path: file_path.display().to_string(),
-            relative_path: relative_path.display().to_string(),
+            file_path: file_path.display().to_string().replace('\\', "/"),
+            relative_path: relative_path.display().to_string().replace('\\', "/"),
             event_type: Self::event_kind_to_string(event_kind),
-            absolute_path: absolute_path.display().to_string(),
+            absolute_path: absolute_path.display().to_string().replace('\\', "/"),
         }
     }
 
