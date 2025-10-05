@@ -1,157 +1,196 @@
 # Release Please Setup Guide
 
-This document explains how to configure automated releases using Release Please.
+This document explains the automated release configuration for vibewatch.
 
-## The Problem
+## Status: ✅ Fully Configured
 
-GitHub Actions has a security restriction: workflows using `GITHUB_TOKEN` cannot create or approve pull requests. This prevents Release Please from creating release PRs.
-
-**Error message:**
-```
-Error: GitHub Actions is not permitted to create or approve pull requests.
-```
-
-## The Solution
-
-Use a Personal Access Token (PAT) with `repo` scope instead of the default `GITHUB_TOKEN`.
-
-## Setup Instructions
-
-### 1. Create a Personal Access Token
-
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Direct link: https://github.com/settings/tokens
-2. Click "Generate new token" → "Generate new token (classic)"
-3. Configure the token:
-   - **Note**: `vibewatch-release-please` (or any descriptive name)
-   - **Expiration**: Choose appropriate expiration (or "No expiration" for long-term projects)
-   - **Scopes**: Select `repo` (Full control of private repositories)
-     - This includes: `repo:status`, `repo_deployment`, `public_repo`, `repo:invite`, `security_events`
-4. Click "Generate token"
-5. **Copy the token immediately** (you won't be able to see it again)
-
-### 2. Add Token as Repository Secret
-
-1. Go to your repository on GitHub
-2. Navigate to Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Configure the secret:
-   - **Name**: `RELEASE_PLEASE_TOKEN`
-   - **Secret**: Paste the PAT you created in step 1
-5. Click "Add secret"
-
-### 3. Verify Configuration
-
-The workflow is already configured to use the token:
-
-```yaml
-- name: Run Release Please
-  id: release
-  uses: googleapis/release-please-action@v4
-  with:
-    release-type: rust
-    # Uses PAT if available, falls back to GITHUB_TOKEN
-    token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-```
-
-### 4. Test the Setup
-
-1. Make a commit with a conventional commit message:
-   ```bash
-   git commit -m "feat: add new feature"
-   git push origin master
-   ```
-
-2. Check the Actions tab to verify Release Please creates a PR:
-   - Go to: https://github.com/rodrigogs/vibewatch/actions
-   - Look for the "Release Please" workflow
-   - It should complete successfully and create a release PR
+Release Please is **already configured and working**. No additional setup required!
 
 ## How It Works
 
-### Workflow Trigger
-Release Please runs on every push to the `master` branch:
+### Repository Configuration
 
-```yaml
-on:
-  push:
-    branches:
-      - master
-```
+The repository has been configured with the following settings to allow automated releases:
 
-### Release PR Creation
-1. Release Please analyzes commits since the last release
-2. Based on conventional commit messages, it determines the version bump:
+**Workflow Permissions** (Settings → Actions → General):
+- ✅ Default workflow permissions: **Read and write**
+- ✅ Allow GitHub Actions to create and approve pull requests: **Enabled**
+
+This allows the Release Please workflow to:
+- Analyze conventional commits
+- Create/update release pull requests
+- Update CHANGELOG.md and version numbers automatically
+
+### Release Workflow
+
+The `.github/workflows/release.yml` workflow runs on every push to `master` and:
+
+1. **Analyzes commits** using conventional commit format:
    - `feat:` → minor version bump (0.X.0)
    - `fix:` → patch version bump (0.0.X)
    - `feat!:` or `fix!:` → major version bump (X.0.0)
-3. It creates/updates a release PR with:
-   - Updated `CHANGELOG.md`
+
+2. **Creates/updates a release PR** with:
    - Updated version in `Cargo.toml`
    - Updated `Cargo.lock`
+   - Generated `CHANGELOG.md` entries
 
-### Release Creation
-1. When you merge the release PR, Release Please:
-   - Creates a GitHub Release with tag (e.g., `v0.2.0`)
-   - Includes release notes from `CHANGELOG.md`
-2. The CI workflow then:
+3. **When you merge the release PR**:
+   - Creates a GitHub Release with tag
    - Publishes to crates.io (if `CARGO_TOKEN` is configured)
    - Builds binaries for 6 platforms
-   - Attaches binaries to the GitHub Release
+   - Attaches binaries to the release
+
+## Using Release Please
+
+### 1. Make commits with conventional format
+
+```bash
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve bug"
+git commit -m "feat!: breaking change"
+git push origin master
+```
+
+### 2. Wait for Release Please to create a PR
+
+After pushing, check the Pull Requests tab for a PR titled like "chore: release 0.2.0".
+
+### 3. Review and merge the release PR
+
+The PR will show:
+- Version bump
+- CHANGELOG updates
+- All commits since last release
+
+Merge it when ready to release!
+
+### 4. Release is automatically published
+
+After merging:
+- GitHub Release is created
+- Binaries are built and attached
+- (Optional) Package is published to crates.io
+
+## Conventional Commit Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+
+- `feat:` - New feature (minor bump)
+- `fix:` - Bug fix (patch bump)
+- `docs:` - Documentation only
+- `chore:` - Maintenance/tooling
+- `refactor:` - Code refactoring
+- `test:` - Adding tests
+- `perf:` - Performance improvement
+- `ci:` - CI/CD changes
+
+### Breaking Changes
+
+Add `!` after type or add `BREAKING CHANGE:` in footer:
+
+```bash
+feat!: redesign CLI interface
+```
+
+or
+
+```bash
+feat: redesign CLI
+
+BREAKING CHANGE: old CLI flags are no longer supported
+```
 
 ## Troubleshooting
 
-### Error: "GitHub Actions is not permitted to create or approve pull requests"
-
-**Cause**: The `RELEASE_PLEASE_TOKEN` secret is not configured.
-
-**Solution**: Follow steps 1-2 above to create and add the PAT.
-
-### Error: "Resource not accessible by integration"
-
-**Cause**: The PAT doesn't have sufficient permissions.
-
-**Solution**: Verify the token has `repo` scope enabled.
-
-### Error: "Bad credentials"
-
-**Cause**: The PAT has expired or been revoked.
-
-**Solution**: Generate a new PAT and update the secret.
-
-### Release PR is not created
+### Issue: Release PR is not created
 
 **Possible causes:**
-1. No conventional commits since last release
-   - Solution: Use `feat:`, `fix:`, etc. in commit messages
-2. Token not configured correctly
-   - Solution: Check secret name is exactly `RELEASE_PLEASE_TOKEN`
-3. Workflow permissions insufficient
-   - Solution: Verify workflow has `contents: write` and `pull-requests: write` permissions
 
-## Alternative: Workflow Permissions (Organization Setting)
+1. **No commits since last release**
+   - Solution: Make a commit with conventional format
 
-If you have admin access to the organization/repository, you can allow GitHub Actions to create pull requests:
+2. **Commits don't follow conventional format**
+   - Solution: Use `feat:`, `fix:`, etc. prefixes
 
+3. **Workflow permissions reverted**
+   - Solution: Check Settings → Actions → General → Workflow permissions
+   - Ensure "Read and write permissions" is selected
+   - Ensure "Allow GitHub Actions to create and approve pull requests" is enabled
+
+### Issue: Workflow fails with permission error
+
+**Error**: "GitHub Actions is not permitted to create or approve pull requests"
+
+**Solution**: The workflow permissions may have been changed. To fix:
+
+```bash
+gh api -X PUT repos/rodrigogs/vibewatch/actions/permissions/workflow \
+  -f default_workflow_permissions=write \
+  -F can_approve_pull_request_reviews=true
+```
+
+Or manually via GitHub UI:
 1. Go to Settings → Actions → General
-2. Scroll to "Workflow permissions"
-3. Select "Read and write permissions"
-4. Check "Allow GitHub Actions to create and approve pull requests"
-5. Click "Save"
+2. Under "Workflow permissions":
+   - Select "Read and write permissions"
+   - Check "Allow GitHub Actions to create and approve pull requests"
+3. Click "Save"
 
-**Note**: This is less secure than using a PAT with limited scope. PAT is the recommended approach.
+### Issue: Release is not published to crates.io
 
-## Security Considerations
+**Cause**: `CARGO_TOKEN` secret is not configured.
 
-- **PAT Scope**: Only grant `repo` scope, nothing more
-- **PAT Expiration**: Set an expiration date and rotate tokens regularly
-- **Secret Storage**: Never commit the PAT to the repository
-- **Access Control**: Limit who can modify repository secrets
-- **Audit**: Regularly review PAT usage in GitHub's audit log
+**Solution**: Add your crates.io API token:
+
+```bash
+# Get your token from https://crates.io/me
+gh secret set CARGO_TOKEN
+# Paste your token when prompted
+```
+
+## Security Notes
+
+Using repository workflow permissions (instead of a PAT) is the **recommended approach** because:
+- ✅ No token management required
+- ✅ No token expiration issues
+- ✅ Automatically scoped to repository
+- ✅ Follows principle of least privilege
+- ✅ Easier to audit and maintain
+
+The workflow has explicit permissions defined:
+```yaml
+permissions:
+  contents: write        # Create releases
+  pull-requests: write   # Create release PRs
+```
+
+## Alternative: Personal Access Token (Not Recommended)
+
+If you prefer to use a PAT instead of repository permissions:
+
+1. Create a PAT at https://github.com/settings/tokens with `repo` scope
+2. Add it as a secret:
+   ```bash
+   gh secret set RELEASE_PLEASE_TOKEN
+   ```
+3. Update `.github/workflows/release.yml`:
+   ```yaml
+   token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+   ```
+
+**Note**: This approach requires token maintenance and rotation. Repository permissions are simpler.
 
 ## Further Reading
 
 - [Release Please Documentation](https://github.com/googleapis/release-please)
-- [Conventional Commits Specification](https://www.conventionalcommits.org/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
 - [GitHub Actions Permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication)
-- [GitHub Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
