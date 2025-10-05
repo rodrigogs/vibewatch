@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/rodrigogs/vibewatch/actions/workflows/ci.yml/badge.svg)](https://github.com/rodrigogs/vibewatch/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/rodrigogs/vibewatch/branch/master/graph/badge.svg)](https://codecov.io/gh/rodrigogs/vibewatch)
+[![Crates.io](https://img.shields.io/crates/v/vibewatch.svg)](https://crates.io/crates/vibewatch)
+[![Downloads](https://img.shields.io/crates/d/vibewatch.svg)](https://crates.io/crates/vibewatch)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.89.0+-orange.svg)](https://www.rust-lang.org)
 
@@ -9,6 +11,8 @@ A fast and extensible file watcher utility built in Rust with glob pattern suppo
 
 ## Features
 
+- **Custom command execution**: Run commands on file changes with event-specific triggers (`--on-create`, `--on-modify`, `--on-delete`, `--on-change`)
+- **Template substitution**: Use `{file_path}`, `{relative_path}`, `{absolute_path}`, `{event_type}` in commands
 - **Cross-platform file watching**: Uses the `notify` crate for efficient file system monitoring
 - **Glob pattern support**: Include and exclude files using glob patterns like `*.rs`, `node_modules/**`
 - **Extensible architecture**: Clean separation of concerns for easy feature additions
@@ -18,21 +22,62 @@ A fast and extensible file watcher utility built in Rust with glob pattern suppo
 
 ## Installation
 
-Make sure you have Rust installed via `mise`:
+### From crates.io (Recommended)
 
 ```bash
-# Install dependencies and build
+cargo install vibewatch
+```
+
+### From Binary Releases
+
+Download pre-built binaries for Linux, macOS, or Windows from the [latest release](https://github.com/rodrigogs/vibewatch/releases/latest).
+
+### From Source
+
+Make sure you have Rust installed via `mise` or `rustup`:
+
+```bash
+# Clone and build
+git clone https://github.com/rodrigogs/vibewatch.git
+cd vibewatch
 cargo build --release
 ```
 
 ## Usage
 
-### Basic Usage
+### Command Execution on File Changes
 
-Watch a directory and log all file changes:
+The primary use case is executing commands when files change:
 
 ```bash
-./target/release/vibewatch /path/to/directory
+# Run tests on any change
+vibewatch . --on-change "npm test"
+
+# Format Rust files when modified
+vibewatch src --include "*.rs" --on-modify "rustfmt {file_path}"
+
+# Run linter on TypeScript files
+vibewatch . --include "*.{ts,tsx}" --exclude "node_modules/**" --on-modify "npx eslint {file_path} --fix"
+
+# Different commands for different events
+vibewatch src \
+  --on-create "git add {file_path}" \
+  --on-modify "cargo check" \
+  --on-delete "echo Removed: {relative_path}"
+```
+
+**Available Templates:**
+- `{file_path}` - Full path to the changed file
+- `{relative_path}` - Path relative to watched directory
+- `{absolute_path}` - Absolute path to the changed file
+- `{event_type}` - Type of event (create, modify, delete)
+
+### Watch-Only Mode
+
+Watch a directory and log all file changes (no commands):
+
+```bash
+vibewatch /path/to/directory
 ```
 
 ### Include Patterns
@@ -40,7 +85,7 @@ Watch a directory and log all file changes:
 Watch only specific file types:
 
 ```bash
-./target/release/vibewatch /path/to/directory --include "*.rs" --include "*.ts"
+vibewatch /path/to/directory --include "*.rs" --include "*.ts"
 ```
 
 ### Exclude Patterns
@@ -48,7 +93,7 @@ Watch only specific file types:
 Ignore common directories and files:
 
 ```bash
-./target/release/vibewatch /path/to/directory --exclude "node_modules/**" --exclude ".git/**" --exclude "target/**"
+vibewatch /path/to/directory --exclude "node_modules/**" --exclude ".git/**" --exclude "target/**"
 ```
 
 ### Combined Patterns
@@ -56,7 +101,7 @@ Ignore common directories and files:
 Use both include and exclude patterns:
 
 ```bash
-./target/release/vibewatch . \
+vibewatch . \
   --include "*.rs" \
   --include "*.ts" \
   --include "*.tsx" \
@@ -67,43 +112,67 @@ Use both include and exclude patterns:
 
 ### Options
 
+**Directory:**
 - `<DIRECTORY>`: Directory to watch (can be relative or absolute)
+
+**Command Execution:**
+- `--on-create <COMMAND>`: Run command when files are created
+- `--on-modify <COMMAND>`: Run command when files are modified
+- `--on-delete <COMMAND>`: Run command when files are deleted
+- `--on-change <COMMAND>`: Run command on any file change (fallback)
+
+**Filtering:**
 - `-i, --include <PATTERN>`: Include patterns like `*.ts`, `*.tsx`, `*.rs`
 - `-e, --exclude <PATTERN>`: Exclude patterns like `node_modules/**`, `.git/**`, `.next/**`
+
+**General:**
 - `-v, --verbose`: Enable verbose output with debug logging
 - `-h, --help`: Show help message
 - `-V, --version`: Show version information
 
 ## Examples
 
-### Watch TypeScript/JavaScript project
+### Auto-format TypeScript on save
 
 ```bash
-./target/release/vibewatch src \
-  --include "*.ts" \
-  --include "*.tsx" \
-  --include "*.js" \
-  --include "*.jsx" \
+vibewatch src \
+  --include "*.ts" --include "*.tsx" \
+  --exclude "node_modules/**" --exclude "dist/**" \
+  --on-modify "npx prettier --write {file_path}"
+```
+
+### Run Rust tests on file changes
+
+```bash
+vibewatch . \
+  --include "*.rs" --include "Cargo.toml" \
+  --exclude "target/**" \
+  --on-change "cargo test"
+```
+
+### Rebuild documentation on changes
+
+```bash
+vibewatch docs \
+  --include "*.md" --include "*.rst" \
+  --exclude "_build/**" \
+  --on-change "mdbook build"
+```
+
+### Watch and restart development server
+
+```bash
+vibewatch src \
+  --include "*.js" --include "*.json" \
   --exclude "node_modules/**" \
-  --exclude "dist/**"
+  --on-change "pkill -f 'node server.js' && node server.js &"
 ```
 
-### Watch Rust project
+### Auto-commit on file creation
 
 ```bash
-./target/release/vibewatch . \
-  --include "*.rs" \
-  --include "Cargo.toml" \
-  --exclude "target/**"
-```
-
-### Watch documentation changes
-
-```bash
-./target/release/vibewatch docs \
-  --include "*.md" \
-  --include "*.rst" \
-  --exclude "_build/**"
+vibewatch src \
+  --on-create "git add {file_path} && git commit -m 'Add {relative_path}'"
 ```
 
 ## Architecture
@@ -136,14 +205,10 @@ The application is structured for extensibility:
 
 ## Future Enhancements
 
-The current implementation logs file changes to the console. Future versions could include:
+The following features are planned for future releases:
 
-- Custom command execution on file changes
-- HTTP webhook notifications
-- File change aggregation and batching
-- Configuration file support
-- Plugin system for custom handlers
-- Integration with development tools
+- **Configuration file support**: Store watch patterns and commands in `.vibewatch.toml`
+- **Ignore file support**: Respect `.gitignore`, `.watchignore` patterns
 
 ## Requirements
 
