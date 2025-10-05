@@ -48,10 +48,30 @@ impl TemplateContext {
         let absolute_path = watch_path.join(relative_path);
         // Normalize all paths to use forward slashes for cross-platform consistency
         Self {
-            file_path: file_path.display().to_string().replace('\\', "/"),
-            relative_path: relative_path.display().to_string().replace('\\', "/"),
+            file_path: Self::normalize_path(file_path),
+            relative_path: Self::normalize_path(relative_path),
             event_type: Self::event_kind_to_str(event_kind),
-            absolute_path: absolute_path.display().to_string().replace('\\', "/"),
+            absolute_path: Self::normalize_path(&absolute_path),
+        }
+    }
+
+    /// Normalize path to use forward slashes
+    /// 
+    /// On Unix systems, avoids string replacement (just converts to string).
+    /// On Windows, replaces backslashes with forward slashes.
+    /// 
+    /// Performance: On Unix/macOS (no backslashes), this is a simple to_string().
+    /// On Windows (has backslashes), performs replace operation.
+    fn normalize_path(path: &Path) -> String {
+        let path_str = path.display().to_string();
+        
+        // Check if path contains backslashes (Windows-specific)
+        if path_str.contains('\\') {
+            // Windows: need to replace backslashes
+            path_str.replace('\\', "/")
+        } else {
+            // Unix/macOS: no backslashes, return as-is
+            path_str
         }
     }
 
