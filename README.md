@@ -218,9 +218,56 @@ cargo clippy
 cargo fmt
 ```
 
+## Contributing
+
+### Commit Message Convention
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning and changelog generation.
+
+**Format**: `<type>(<optional scope>): <description>`
+
+**Types:**
+- `feat:` - New feature (triggers minor version bump)
+- `fix:` - Bug fix (triggers patch version bump)
+- `docs:` - Documentation changes
+- `chore:` - Maintenance tasks
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `feat!:` or `fix!:` - Breaking changes (triggers major version bump)
+
+**Examples:**
+```bash
+feat: add support for symlink watching
+fix: resolve race condition in file detection
+docs: update README with new examples
+feat!: change CLI argument structure (breaking change)
+```
+
+### Release Process
+
+Releases are automated via [Release Please](https://github.com/googleapis/release-please):
+
+1. **Commit using conventional commits** - Each commit to `master` is analyzed
+2. **Release PR is created** - Release Please opens a PR with updated version and CHANGELOG
+3. **Merge the Release PR** - This triggers:
+   - GitHub Release creation
+   - Binary builds for Linux, macOS, Windows (x86_64, ARM64)
+   - Optional publish to crates.io (if `CARGO_TOKEN` secret is configured)
+
+**Manual release**: Just merge the automatically created "chore: release X.Y.Z" PR.
+
+### CI/CD
+
+All PRs and pushes to `master` run:
+- ✅ Tests (187 tests on Linux, macOS, Windows)
+- ✅ Formatting check (`cargo fmt --check`)
+- ✅ Linting (`cargo clippy`)
+- ✅ Coverage report (uploaded to Codecov)
+
 ## Documentation
 
 For comprehensive technical documentation:
 - **Testing Guide**: `docs/TESTING.md` - Test organization, best practices, and quick reference
 - **Coverage Analysis**: `docs/COVERAGE.md` - Detailed coverage metrics and industry benchmarks
 - **Integration Tests**: `docs/INTEGRATION_TEST.md` - Testing research, rationale, and best practices
+- **Justfile Guide**: `docs/JUSTFILE_IMPLEMENTATION.md` - Task runner implementation and benefits

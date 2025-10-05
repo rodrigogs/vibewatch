@@ -115,6 +115,65 @@ PatternFilter::new(include, exclude)
 - Rust 1.89.0 (edition 2024 support)
 - `RUST_BACKTRACE=1` set in mise config
 
+## Release Process & Conventional Commits
+
+**This project uses automated releases via Release Please.**
+
+### Commit Message Format
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<optional scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types that trigger releases:**
+- `feat:` - New feature → **minor** version bump (0.X.0)
+- `fix:` - Bug fix → **patch** version bump (0.0.X)
+- `feat!:`, `fix!:`, `refactor!:` - Breaking change → **major** version bump (X.0.0)
+
+**Other types** (no version bump):
+- `docs:` - Documentation only
+- `chore:` - Maintenance tasks
+- `test:` - Test additions/changes
+- `refactor:` - Code refactoring
+- `style:` - Code formatting
+
+**Examples:**
+```bash
+feat: add symlink watching support
+fix: resolve race condition in event detection
+docs: update README with new examples
+feat!: change CLI argument structure (BREAKING CHANGE)
+```
+
+### Release Workflow
+
+1. **Commit to `master`** using conventional commits
+2. **Release Please creates PR** - Automatically updates `CHANGELOG.md` and `Cargo.toml` version
+3. **Merge the Release PR** - Triggers:
+   - GitHub Release creation with release notes
+   - Binary builds (Linux x86_64/ARM64, macOS x86_64/ARM64, Windows x86_64)
+   - Optional publish to crates.io (requires `CARGO_TOKEN` secret)
+
+**Never manually edit** `CHANGELOG.md` or version in `Cargo.toml` - Release Please manages these.
+
+### CI/CD Pipeline
+
+**On every PR and push to `master`:**
+- ✅ Tests (187 tests) on Linux, macOS, Windows
+- ✅ Rustfmt check (`cargo fmt --check`)
+- ✅ Clippy with `-D warnings`
+- ✅ Coverage generation (uploaded to Codecov)
+
+**Workflow files:**
+- `.github/workflows/ci.yml` - Continuous integration checks
+- `.github/workflows/release.yml` - Automated releases and binary publishing
+
 ## When Adding Features
 
 1. Write unit tests inline in same file (`#[cfg(test)]` module)
@@ -122,6 +181,7 @@ PatternFilter::new(include, exclude)
 3. Use `tests/common/mod.rs` helpers for file operations and timeouts
 4. Update coverage docs if uncovered lines change
 5. Update README examples if user-facing behavior changes
+6. **Use conventional commit messages** for proper versioning
 
 ## Common Pitfalls to Avoid
 
@@ -131,3 +191,5 @@ PatternFilter::new(include, exclude)
 - ❌ Hardcoding timeouts in tests (use `common::*_TIME` constants)
 - ❌ Generic error messages (use `.context()` for specificity)
 - ❌ Synchronous command execution (use `tokio::process::Command`)
+- ❌ Manually editing CHANGELOG.md or version numbers (let Release Please handle it)
+- ❌ Non-conventional commit messages (breaks automated releases)
