@@ -1,0 +1,7 @@
+[tools]
+# Use latest stable Rust
+rust = "1.89.0"
+
+[env]
+# Set environment variables for Rust development
+RUST_BACKTRACE = "1"
