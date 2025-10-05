@@ -1,5 +1,10 @@
 # VibeWatch
 
+[![CI](https://github.com/rodrigogs/vibewatch/actions/workflows/ci.yml/badge.svg)](https://github.com/rodrigogs/vibewatch/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/rodrigogs/vibewatch/branch/master/graph/badge.svg)](https://codecov.io/gh/rodrigogs/vibewatch)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+[![Rust Version](https://img.shields.io/badge/rust-1.89.0+-orange.svg)](https://www.rust-lang.org)
+
 A fast and extensible file watcher utility built in Rust with glob pattern support.
 
 ## Features
