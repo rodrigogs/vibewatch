@@ -350,13 +350,14 @@ impl FileWatcher {
     async fn execute_shell_command(command: &str) -> Result<std::process::Output> {
         log::debug!("Executing shell command: {}", command);
 
-        // Split command into program and args (simple parsing)
-        let parts: Vec<&str> = command.split_whitespace().collect();
+        // Parse command with proper quote handling
+        let parts = shell_words::split(command)
+            .context("Failed to parse command")?;
         if parts.is_empty() {
             anyhow::bail!("Empty command");
         }
 
-        let program = parts[0];
+        let program = &parts[0];
         let args = &parts[1..];
 
         let output = TokioCommand::new(program)

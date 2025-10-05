@@ -22,6 +22,8 @@ log = "0.4"
 env_logger = "0.11"
 # Async runtime for command execution
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "time", "sync", "signal"] }
+# Shell-like command parsing with quote support
+shell-words = "1.1"
 
 [dev-dependencies]
 # Mocking framework
