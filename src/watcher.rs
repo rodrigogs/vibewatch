@@ -34,7 +34,7 @@ impl CommandConfig {
 pub(crate) struct TemplateContext {
     file_path: String,
     relative_path: String,
-    event_type: String,
+    event_type: &'static str,
     absolute_path: String,
 }
 
@@ -50,17 +50,17 @@ impl TemplateContext {
         Self {
             file_path: file_path.display().to_string().replace('\\', "/"),
             relative_path: relative_path.display().to_string().replace('\\', "/"),
-            event_type: Self::event_kind_to_string(event_kind),
+            event_type: Self::event_kind_to_str(event_kind),
             absolute_path: absolute_path.display().to_string().replace('\\', "/"),
         }
     }
 
-    pub fn event_kind_to_string(event_kind: &EventKind) -> String {
+    pub fn event_kind_to_str(event_kind: &EventKind) -> &'static str {
         match event_kind {
-            EventKind::Create(_) => "create".to_string(),
-            EventKind::Modify(_) => "modify".to_string(),
-            EventKind::Remove(_) => "delete".to_string(),
-            _ => "change".to_string(),
+            EventKind::Create(_) => "create",
+            EventKind::Modify(_) => "modify",
+            EventKind::Remove(_) => "delete",
+            _ => "change",
         }
     }
 
@@ -711,23 +711,21 @@ mod tests {
     #[test]
     fn test_event_kind_to_string_all_types() {
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Create(CreateKind::File)),
+            TemplateContext::event_kind_to_str(&EventKind::Create(CreateKind::File)),
             "create"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Modify(ModifyKind::Data(
+            TemplateContext::event_kind_to_str(&EventKind::Modify(ModifyKind::Data(
                 notify::event::DataChange::Any
             ))),
             "modify"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Remove(RemoveKind::File)),
+            TemplateContext::event_kind_to_str(&EventKind::Remove(RemoveKind::File)),
             "delete"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Access(
-                notify::event::AccessKind::Any
-            )),
+            TemplateContext::event_kind_to_str(&EventKind::Access(notify::event::AccessKind::Any)),
             "change"
         );
     }
@@ -977,7 +975,7 @@ mod tests {
     fn test_event_kind_to_string_conversion(#[case] event_kind: EventKind, #[case] expected: &str) {
         assert_eq!(
             expected,
-            TemplateContext::event_kind_to_string(&event_kind),
+            TemplateContext::event_kind_to_str(&event_kind),
             "EventKind {:?} should convert to '{}'",
             event_kind,
             expected
