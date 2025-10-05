@@ -42,3 +42,17 @@ assert_cmd = "2"
 assert_fs = "1"
 # Advanced assertions for testing
 predicates = "3"
+# Benchmarking framework
+criterion = "0.5"
+
+[[bench]]
+name = "template_substitution"
+harness = false
+
+[[bench]]
+name = "path_normalization"
+harness = false
+
+[[bench]]
+name = "pattern_matching"
+harness = false
