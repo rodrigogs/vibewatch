@@ -2,24 +2,13 @@
 
 ## Overview
 
-This document describes the complete CI/CD architecture for vibewatch, designed to automate releases while ensuring code quality through branch protection and comprehensive testing.
+This document describes the CI/CD architecture for vibewatch, which automates releases while ensuring code quality through branch protection and comprehensive testing.
 
-## Architecture Decision: workflow_run vs on: push
+**Status**: ✅ Fully implemented and operational as of v0.3.0 (October 2025)
 
-### Current Implementation (workflow_run)
-The current `release.yml` uses the `workflow_run` trigger:
+## Current Implementation
 
-```yaml
-on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [master]
-```
-
-### Recommended Change: Revert to Standard Pattern
-
-After deep analysis of Release Please best practices and GitHub's branch protection capabilities, **the recommended approach is to revert to the standard `on: push` trigger**:
+The project uses a standard Release Please workflow triggered on push to master:
 
 ```yaml
 on:
@@ -28,37 +17,11 @@ on:
       - master
 ```
 
-### Rationale
-
-1. **Branch Protection is the Primary Safety Mechanism**
-   - With strict branch protection enabled, PRs cannot be merged unless all CI checks pass
-   - The PR branch must be up-to-date with master before merge (strict mode)
-   - This ensures that the code being merged has been tested in its final form
-
-2. **Alignment with Best Practices**
-   - The `workflow_run` pattern is NOT mentioned in Release Please documentation
-   - Google (Release Please maintainers) recommends the standard `on: push` pattern
-   - Mainstream Rust projects follow this approach
-
-3. **Performance Benefits**
-   - No waiting for CI to re-run on master after merge
-   - Faster release cycle
-   - Simpler workflow logic
-
-4. **Edge Cases are Handled**
-   - "What if tests pass on PR but fail on master?" → Strict mode prevents this
-   - "What if admin bypasses and pushes directly?" → Don't enable admin bypass
-   - "What if there's an environment-specific issue?" → Extremely rare, monitor via alerts
-
-### When workflow_run Makes Sense
-
-The `workflow_run` pattern would be appropriate if:
-- You have multiple teams with varying permissions
-- You need defense-in-depth against admin bypass
-- You have complex merge strategies beyond squash-merge
-- You have environment-specific concerns not caught by PR testing
-
-**For vibewatch (single developer, clean merge strategy, comprehensive CI), the standard pattern is optimal.**
+This approach aligns with Release Please best practices and provides:
+- Fast release cycles (no waiting for duplicate CI runs)
+- Simple workflow logic
+- Branch protection as the primary safety mechanism
+- Reliable cross-platform binary builds
 
 ## Complete Developer Workflow
 
@@ -138,18 +101,61 @@ The `workflow_run` pattern would be appropriate if:
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 12. Automated post-release tasks                                │
+│ 12. Automated post-release tasks (parallel execution)           │
 │     ✓ Publish to crates.io (if CARGO_TOKEN configured)         │
-│     ✓ Build binaries for 7 platforms                            │
+│     ✓ Build binaries for 5 platforms:                           │
+│       - Linux x86_64 (native build)                             │
+│       - Linux ARM64 (cross-compilation via 'cross')             │
+│       - macOS Intel (native build)                              │
+│       - macOS ARM (native build)                                │
+│       - Windows x64 (native build)                              │
 │     ✓ Upload binaries to GitHub Release                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Branch Protection Configuration
 
-### Required Configuration
+### Current Configuration (Applied)
 
-```json
+✅ **Status**: Branch protection is enabled on `master` branch
+
+The following settings are currently active:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Required Status Checks** | 6 checks | All CI jobs must pass before merge |
+| **Strict Mode** | Enabled | Branch must be up-to-date with base |
+| **Enforce Admins** | Disabled | Allows emergency admin bypass |
+| **Linear History** | Enabled | Enforces clean git history |
+| **Force Pushes** | Disabled | Prevents history rewriting |
+| **Deletions** | Disabled | Prevents accidental branch deletion |
+| **Conversation Resolution** | Enabled | All PR comments must be resolved |
+
+### Required Status Checks
+
+The following CI checks must pass before merging to master:
+- Test Suite (ubuntu-latest, stable)
+- Test Suite (macos-latest, stable)
+- Test Suite (windows-latest, stable)
+- Rustfmt
+- Clippy
+- Code Coverage
+
+### Viewing Current Configuration
+
+To view the current branch protection settings:
+
+```bash
+gh api /repos/rodrigogs/vibewatch/branches/master/protection | jq
+```
+
+### Modifying Branch Protection
+
+To update branch protection settings via GitHub CLI:
+
+```bash
+# Save your desired configuration to a JSON file
+cat > branch-protection.json <<'EOF'
 {
   "required_status_checks": {
     "strict": true,
@@ -170,7 +176,17 @@ The `workflow_run` pattern would be appropriate if:
   "allow_deletions": false,
   "required_conversation_resolution": true
 }
+EOF
+
+# Apply the configuration
+gh api -X PUT /repos/rodrigogs/vibewatch/branches/master/protection \
+  --input branch-protection.json
+
+# Clean up
+rm branch-protection.json
 ```
+
+Alternatively, use the GitHub web UI: Settings → Branches → Branch protection rules
 
 ### Configuration Rationale
 
@@ -198,136 +214,150 @@ To verify status check names:
 
 ## Token Configuration
 
-### GITHUB_TOKEN vs Personal Access Token (PAT)
+### GITHUB_TOKEN (Current)
 
-#### Current Configuration
+The workflow currently uses `GITHUB_TOKEN`:
 ```yaml
 token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-#### Issue with GITHUB_TOKEN
-From GitHub documentation:
+**Status**: ✅ Working correctly for current workflow needs
+
+**Limitation**: From GitHub documentation:
 > When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run.
 
-**Impact**: Workflows triggered by `release.created` events won't run if Release Please uses `GITHUB_TOKEN`.
+**Impact**: If you add workflows that should trigger on `release.created` events, they won't run with `GITHUB_TOKEN`.
 
-#### Recommended: Personal Access Token (PAT)
+### Personal Access Token (Optional Upgrade)
 
-Create a PAT with `repo` scope and configure it as `RELEASE_PLEASE_TOKEN`:
+**When to upgrade**: Only if you need workflows that trigger on Release Please's actions (e.g., deploy on release, notify on release).
 
+**Setup**:
+1. Go to GitHub Settings → Developer settings → Personal access tokens
+2. Generate new token (classic)
+3. Scopes: `repo` (Full control of private repositories)
+4. Add as repository secret: `RELEASE_PLEASE_TOKEN`
+5. Update `release.yml`: `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`
+
+### CARGO_TOKEN (Configured)
+
+**Status**: ✅ Configured and working
+
+Used for automated publishing to crates.io:
 ```yaml
-token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
 ```
 
-**Benefits**:
-- Other workflows can trigger on Release Please's actions
-- More predictable workflow chaining
-- Better for complex automation
+**Token management**:
+- Source: https://crates.io/settings/tokens
+- Stored as: GitHub repository secret `CARGO_TOKEN`
+- Recommendation: Rotate annually for security
 
-**Note**: For vibewatch's current simple workflow, `GITHUB_TOKEN` works fine. Upgrade to PAT if you add workflows that should trigger on release creation.
+## Binary Build Architecture
 
-### CARGO_TOKEN for crates.io
+### Current Implementation (v0.3.0+)
 
-Required for automated publishing to crates.io:
+The release workflow builds binaries for 5 platforms using `taiki-e/upload-rust-binary-action@v1`:
 
-1. Get token from https://crates.io/settings/tokens
-2. Add as GitHub secret: `CARGO_TOKEN`
-3. Used in `publish-crate` job:
-   ```yaml
-   run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
-   ```
-
-## Implementation Plan
-
-### Phase 1: Fix Integration Test Timeouts (BLOCKING - Priority 1)
-
-**Problem**: 6 integration tests fail in CI due to insufficient timeouts.
-
-**Files to modify**: `tests/common/mod.rs`
-
-```rust
-// Change from:
-pub const WATCHER_STARTUP_TIME: u64 = 1500;
-pub const EVENT_DETECTION_TIME: u64 = 1500;
-
-// To:
-pub const WATCHER_STARTUP_TIME: u64 = 3000;
-pub const EVENT_DETECTION_TIME: u64 = 3000;
-```
-
-**Why this is blocking**: Cannot enable branch protection with failing tests (creates catch-22).
-
-**Steps**:
-1. Fix timeouts locally
-2. Run `just test` to verify all 187 tests pass
-3. Push to dev branch
-4. Verify CI passes on dev
-5. Merge to master (while protection is still disabled)
-
-### Phase 2: Revert to Standard Release Pattern (Priority 2)
-
-**File to modify**: `.github/workflows/release.yml`
-
-Change from:
+**Build Matrix**:
 ```yaml
-on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [master]
-
-jobs:
-  release-please:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+strategy:
+  fail-fast: false
+  matrix:
+    include:
+      - target: x86_64-unknown-linux-gnu      # Linux x86_64 (native)
+        os: ubuntu-latest
+      - target: aarch64-unknown-linux-gnu     # Linux ARM64 (cross)
+        os: ubuntu-latest
+      - target: x86_64-apple-darwin           # macOS Intel (native)
+        os: macos-latest
+      - target: aarch64-apple-darwin          # macOS ARM (native)
+        os: macos-latest
+      - target: x86_64-pc-windows-msvc        # Windows x64 (native)
+        os: windows-latest
 ```
 
-To:
+**Build Strategy**:
+- **Linux x86_64**: Native cargo build on Ubuntu runner (~40s)
+- **Linux ARM64**: Cross-compilation using `cross` tool via Docker (~1m16s)
+- **macOS Intel**: Native build on macOS runner (~51s)
+- **macOS ARM**: Native build on macOS runner (~1m2s)
+- **Windows x64**: Native build on Windows runner (~3m52s)
+
+**Key Features**:
+- ✅ Parallel execution (all 5 builds run simultaneously)
+- ✅ Automatic cross-compilation for ARM64 Linux
+- ✅ Proper archive formats (.tar.gz for Unix, .zip for Windows)
+- ✅ No manual build/strip/rename steps needed
+- ✅ Reliable (no timeout issues like previous manual builds)
+- ✅ Battle-tested tool (used by tokio-console, cargo-hack)
+
+**Why taiki-e/upload-rust-binary-action?**
+1. Actively maintained (v1.27.0, June 2024)
+2. Handles cross-compilation automatically via `cross` tool
+3. Simplifies workflow from ~60 to ~40 lines
+4. No GitHub Actions timeout issues
+5. Proper binary naming and archiving
+
+### Release Assets
+
+Each GitHub release includes 5 binaries:
+
+| Platform | Filename | Size | Format |
+|----------|----------|------|--------|
+| Linux x86_64 | `vibewatch-x86_64-unknown-linux-gnu.tar.gz` | ~1.3 MB | tar.gz |
+| Linux ARM64 | `vibewatch-aarch64-unknown-linux-gnu.tar.gz` | ~1.3 MB | tar.gz |
+| macOS Intel | `vibewatch-x86_64-apple-darwin.tar.gz` | ~1.2 MB | tar.gz |
+| macOS ARM | `vibewatch-aarch64-apple-darwin.tar.gz` | ~1.2 MB | tar.gz |
+| Windows x64 | `vibewatch-x86_64-pc-windows-msvc.zip` | ~1.0 MB | zip |
+
+### Historical Context
+
+**v0.2.0 and earlier**: Used manual cross-compilation with apt packages (musl-tools, gcc-aarch64-linux-gnu). This approach suffered from:
+- ❌ Frequent timeouts in GitHub Actions
+- ❌ Complex manual build/strip/rename/upload steps
+- ❌ 7 targets attempted (including musl variants)
+
+**v0.2.1**: Temporarily removed Linux builds to fix timeouts
+- ✅ Released successfully with 3 binaries (macOS x2, Windows)
+- ⚠️ Linux users had to use `cargo install vibewatch`
+
+**v0.3.0+**: Current approach with taiki-e action
+- ✅ Restored Linux support (x86_64 + ARM64)
+- ✅ Reliable builds with no timeouts
+- ✅ Simplified workflow maintenance
+
+## Implementation History
+
+### ✅ Phase 1: Standard Release Pattern (Completed)
+
+**Status**: Implemented in v0.3.0
+
+The workflow uses the standard `on: push` trigger pattern:
 ```yaml
 on:
   push:
     branches:
       - master
-
-jobs:
-  release-please:
-    runs-on: ubuntu-latest
 ```
 
-**Why**: Aligns with Release Please best practices, simpler, faster, and branch protection provides the safety mechanism.
+This aligns with Release Please best practices and provides fast release cycles.
 
-### Phase 3: Enable Branch Protection (Priority 3)
+### ✅ Phase 2: Cross-Platform Binary Builds (Completed)
+
+**Status**: Implemented in v0.3.0
+
+Migrated from manual cross-compilation to `taiki-e/upload-rust-binary-action`, restoring Linux support with improved reliability.
+
+### ✅ Phase 3: Branch Protection (Completed)
 
 **Method 1: GitHub CLI (Recommended)**
 
-Save protection config to `branch-protection.json`:
-```json
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "Test Suite (ubuntu-latest, stable)",
-      "Test Suite (macos-latest, stable)",
-      "Test Suite (windows-latest, stable)",
-      "Rustfmt",
-      "Clippy",
-      "Code Coverage"
-    ]
-  },
-  "enforce_admins": false,
-  "required_pull_request_reviews": null,
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true
-}
-```
+**Status**: Branch protection enabled on `master` branch with all 6 required status checks.
 
-Apply configuration:
-```bash
-gh api -X PUT /repos/rodrigogs/vibewatch/branches/master/protection \
-  --input branch-protection.json
-```
+See "Branch Protection Configuration" section above for current settings.
+
+## Token Configuration (Optional Enhancement)
 
 **Method 2: GitHub Web UI**
 
@@ -348,59 +378,53 @@ gh api -X PUT /repos/rodrigogs/vibewatch/branches/master/protection \
 
 ### Phase 4: Configure Optional Tokens (Priority 4 - Optional)
 
-#### Personal Access Token (Optional)
-1. Go to GitHub Settings → Developer settings → Personal access tokens
-2. Generate new token (classic)
-3. Scopes: `repo` (Full control of private repositories)
-4. Add as repository secret: `RELEASE_PLEASE_TOKEN`
-5. Update `.github/workflows/release.yml`:
-   ```yaml
-   token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-   ```
+## Validating a Release
 
-#### crates.io Token (Required for Publishing)
-1. Go to https://crates.io/settings/tokens
-2. Create new token with publish permission
-3. Add as repository secret: `CARGO_TOKEN`
-4. Already configured in `release.yml`
+### Quick Validation
 
-### Phase 5: Validate Complete Flow (Priority 5)
+To verify the release workflow is working:
 
-**Test Scenario 1: PR with failing tests**
 ```bash
-# Create branch with intentional test failure
-git checkout -b test-branch-protection
-# Add failing test
-git commit -m "test: intentional failure"
-git push origin test-branch-protection
-# Open PR
-gh pr create --base master --head test-branch-protection
-# Verify: PR cannot be merged (checks failing)
+# Check the latest release
+gh release view --web
+
+# Or get release details via CLI
+gh release view v0.3.0
+
+# Verify all 5 binaries are present
+gh release view v0.3.0 --json assets --jq '.assets[].name'
 ```
 
-**Test Scenario 2: PR with passing tests**
-```bash
-# Create branch with valid changes
-git checkout -b test-release-flow
-# Make changes following conventional commits
-git commit -m "feat: add new feature for testing"
-git push origin test-release-flow
-# Open PR
-gh pr create --base master --head test-release-flow
-# Wait for CI to pass
-# Verify: PR can be merged
-# Merge PR
-gh pr merge --squash
-# Verify: Release Please creates release PR
+Expected output:
+```
+vibewatch-aarch64-apple-darwin.tar.gz
+vibewatch-aarch64-unknown-linux-gnu.tar.gz
+vibewatch-x86_64-apple-darwin.tar.gz
+vibewatch-x86_64-pc-windows-msvc.zip
+vibewatch-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-**Test Scenario 3: Complete release**
-1. Verify release PR created with correct version bump
-2. Review CHANGELOG.md changes
-3. Merge release PR
-4. Verify: GitHub release created with tag
-5. Verify: Binaries built and uploaded
-6. Verify: crates.io publish succeeds (if token configured)
+### End-to-End Release Test
+
+**Complete workflow** (tested successfully in v0.3.0):
+1. Make feature branch: `git checkout -b feature-branch`
+2. Commit using Conventional Commits: `git commit -m "feat: new feature"`
+3. Open PR: `gh pr create --base master`
+4. Wait for CI checks (all 6 must pass)
+5. Merge PR: `gh pr merge --squash` (requires admin for branch protection)
+6. Release Please creates release PR automatically
+7. Review release PR (check CHANGELOG.md and version bump)
+8. Merge release PR: `gh pr merge <pr-number> --admin --merge`
+9. Workflow automatically:
+   - Creates GitHub release with tag
+   - Publishes to crates.io
+   - Builds and uploads 5 platform binaries
+10. Verify: `gh release view <version>`
+
+**Typical timeline**:
+- CI checks on PR: ~2-3 minutes
+- Release workflow after merge: ~4 minutes total
+- Binary builds (parallel): 40s - 4m per platform
 
 ## Monitoring and Maintenance
 
@@ -419,22 +443,34 @@ gh pr merge --squash
 | PR can't merge despite passing tests | Status check names don't match | Update branch protection with exact names from PR |
 | Release Please doesn't create PR | No releasable commits (only chore/docs) | Add feat/fix commits |
 | Cargo publish fails | Missing or invalid CARGO_TOKEN | Regenerate token from crates.io |
-| Other workflows don't trigger on release | Using GITHUB_TOKEN instead of PAT | Switch to Personal Access Token |
-| Tests timeout in CI | Insufficient timeout constants | Increase WATCHER_STARTUP_TIME / EVENT_DETECTION_TIME |
+| Other workflows don't trigger on release | Using GITHUB_TOKEN instead of PAT | Switch to Personal Access Token (see Token Configuration) |
+| Binary build fails | Platform-specific build issue | Check workflow logs, may need cross-compilation adjustment |
+| Linux ARM64 build timeout | Cross tool not installed | Verified working in v0.3.0, check `taiki-e/install-action` step |
 
-### Rollback Plan
+### Emergency Procedures
 
-If branch protection causes issues:
+**Temporarily disable branch protection** (emergencies only):
 
 ```bash
-# Disable branch protection temporarily
+# Disable branch protection
 gh api -X DELETE /repos/rodrigogs/vibewatch/branches/master/protection
 
-# Fix issues
+# Make emergency fix
 
-# Re-enable protection
-gh api -X PUT /repos/rodrigogs/vibewatch/branches/master/protection \
-  --input branch-protection.json
+# Re-enable protection (see "Modifying Branch Protection" section above)
+```
+
+**Roll back a release**:
+
+```bash
+# Delete the GitHub release and tag
+gh release delete v<version> --yes
+git push origin :refs/tags/v<version>
+
+# Yank from crates.io (makes it unavailable for new downloads)
+cargo yank --vers <version>
+
+# If needed, publish a patch release with fix
 ```
 
 ## Security Considerations
@@ -458,22 +494,22 @@ gh api -X PUT /repos/rodrigogs/vibewatch/branches/master/protection \
 
 ### Potential Improvements
 
-1. **Required Reviews**: Add when team grows beyond solo developer
-2. **CODEOWNERS**: Define code ownership for different modules
-3. **Deploy Preview**: Add preview deployments for PRs
-4. **Performance Benchmarks**: Add benchmark CI checks
-5. **Automated Rollback**: Add workflow to rollback failed releases
-6. **Release Notes Enhancement**: Customize Release Please templates
-7. **Binary Signing**: Sign release binaries for verification
+1. **Binary Signing**: Sign release binaries for verification (cosign, GPG)
+2. **Performance Benchmarks**: Add benchmark CI checks for regression detection
+3. **Release Notes Enhancement**: Customize Release Please templates with more detail
+4. **Automated Security Scanning**: Add dependency vulnerability checks
+5. **Release Notifications**: Notify on release creation (Discord, Slack)
+6. **Download Statistics**: Track binary download metrics
+7. **Additional Platforms**: Consider adding more targets (FreeBSD, musl variants)
 
 ### Scaling Considerations
 
-As vibewatch grows:
-- Add required reviewers for critical paths
+When vibewatch grows beyond solo development:
+- Add required pull request reviews
 - Implement CODEOWNERS for module ownership
-- Consider merge queue for high-velocity merging
-- Add deployment environments (staging, production)
-- Implement blue-green deployment strategy
+- Consider merge queue for high-velocity development
+- Add deployment environments if needed (staging, production)
+- Implement more granular access controls
 
 ## References
 
@@ -486,6 +522,17 @@ As vibewatch grows:
 
 ---
 
-**Last Updated**: October 5, 2025
-**Version**: 1.0
+**Last Updated**: October 6, 2025
+**Version**: 2.0 (Updated to reflect v0.3.0 implementation)
 **Maintainer**: @rodrigogs
+
+## Recent Changes
+
+### v2.0 (October 6, 2025)
+- Updated to reflect current v0.3.0 implementation
+- Documented taiki-e/upload-rust-binary-action migration
+- Added 5-platform binary build details
+- Removed outdated implementation plan phases (all completed)
+- Updated branch protection to current configured state
+- Added historical context for build evolution
+- Removed `.github/branch-protection.json` (now documented inline)
