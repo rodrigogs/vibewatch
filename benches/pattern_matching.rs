@@ -1,10 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use glob::Pattern;
 use std::path::Path;
 
 fn pattern_matching_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("pattern_matching");
-    
+
     // Common patterns
     let patterns = vec![
         "*.rs",
@@ -13,7 +13,7 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
         "**/*.{rs,toml}",
         "**/target/**",
     ];
-    
+
     // Test paths
     let paths = vec![
         "src/main.rs",
@@ -25,7 +25,7 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
         "src/utils/helper.rs",
         "benches/benchmark.rs",
     ];
-    
+
     // Benchmark pattern compilation
     group.bench_function("pattern_compilation", |b| {
         b.iter(|| {
@@ -35,11 +35,11 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
             }
         });
     });
-    
+
     // Benchmark pattern matching
     for pattern_str in &patterns {
         let pattern = Pattern::new(pattern_str).unwrap();
-        
+
         group.bench_with_input(
             BenchmarkId::new("match", pattern_str),
             &pattern,
@@ -53,13 +53,11 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
             },
         );
     }
-    
+
     // Benchmark with compiled patterns (cached)
-    let compiled_patterns: Vec<Pattern> = patterns
-        .iter()
-        .map(|p| Pattern::new(p).unwrap())
-        .collect();
-    
+    let compiled_patterns: Vec<Pattern> =
+        patterns.iter().map(|p| Pattern::new(p).unwrap()).collect();
+
     group.bench_function("multiple_patterns_compiled", |b| {
         b.iter(|| {
             for path in &paths {
@@ -70,10 +68,10 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
             }
         });
     });
-    
+
     // Benchmark pattern matching with Path types
-    let path_objects: Vec<&Path> = paths.iter().map(|p| Path::new(p)).collect();
-    
+    let path_objects: Vec<&Path> = paths.iter().map(Path::new).collect();
+
     group.bench_function("match_with_path_objects", |b| {
         b.iter(|| {
             for path in &path_objects {
@@ -85,38 +83,38 @@ fn pattern_matching_benchmark(c: &mut Criterion) {
             }
         });
     });
-    
+
     group.finish();
 }
 
 fn exclude_pattern_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("exclude_patterns");
-    
+
     // Common exclude patterns
-    let exclude_patterns = vec![
+    let exclude_patterns = [
         "**/target/**",
         "**/.git/**",
         "**/node_modules/**",
         "**/*.tmp",
         "**/.*",
     ];
-    
+
     let compiled_excludes: Vec<Pattern> = exclude_patterns
         .iter()
         .map(|p| Pattern::new(p).unwrap())
         .collect();
-    
+
     // Test paths (some should be excluded)
     let test_paths = vec![
-        "src/main.rs",              // Should not be excluded
-        "target/debug/lib.rs",      // Should be excluded
-        ".git/config",              // Should be excluded
-        "node_modules/package.json",// Should be excluded
-        "temp.tmp",                 // Should be excluded
-        ".hidden",                  // Should be excluded
-        "tests/test.rs",            // Should not be excluded
+        "src/main.rs",               // Should not be excluded
+        "target/debug/lib.rs",       // Should be excluded
+        ".git/config",               // Should be excluded
+        "node_modules/package.json", // Should be excluded
+        "temp.tmp",                  // Should be excluded
+        ".hidden",                   // Should be excluded
+        "tests/test.rs",             // Should not be excluded
     ];
-    
+
     // Benchmark exclude logic
     group.bench_function("check_excludes", |b| {
         b.iter(|| {
@@ -128,10 +126,10 @@ fn exclude_pattern_benchmark(c: &mut Criterion) {
             }
         });
     });
-    
+
     // Benchmark include + exclude logic (realistic scenario)
     let include_pattern = Pattern::new("**/*.rs").unwrap();
-    
+
     group.bench_function("include_and_exclude", |b| {
         b.iter(|| {
             for path in &test_paths {
@@ -144,17 +142,17 @@ fn exclude_pattern_benchmark(c: &mut Criterion) {
             }
         });
     });
-    
+
     group.finish();
 }
 
 fn glob_alternatives_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("glob_alternatives");
-    
+
     let pattern_str = "**/*.rs";
     let pattern = Pattern::new(pattern_str).unwrap();
     let path = "src/utils/helper.rs";
-    
+
     // Simple string comparison (baseline)
     group.bench_function("string_ends_with", |b| {
         b.iter(|| {
@@ -162,7 +160,7 @@ fn glob_alternatives_benchmark(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     // Glob pattern matching
     group.bench_function("glob_pattern_match", |b| {
         b.iter(|| {
@@ -170,17 +168,17 @@ fn glob_alternatives_benchmark(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     // Complex pattern
     let complex_pattern = Pattern::new("src/**/*.{rs,toml}").unwrap();
-    
+
     group.bench_function("complex_glob_match", |b| {
         b.iter(|| {
             let result = complex_pattern.matches(black_box(path));
             black_box(result);
         });
     });
-    
+
     group.finish();
 }
 

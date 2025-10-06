@@ -56,15 +56,15 @@ impl TemplateContext {
     }
 
     /// Normalize path to use forward slashes
-    /// 
+    ///
     /// On Unix systems, avoids string replacement (just converts to string).
     /// On Windows, replaces backslashes with forward slashes.
-    /// 
+    ///
     /// Performance: On Unix/macOS (no backslashes), this is a simple to_string().
     /// On Windows (has backslashes), performs replace operation.
     fn normalize_path(path: &Path) -> String {
         let path_str = path.display().to_string();
-        
+
         // Check if path contains backslashes (Windows-specific)
         if path_str.contains('\\') {
             // Windows: need to replace backslashes
@@ -85,29 +85,29 @@ impl TemplateContext {
     }
 
     /// Substitute template variables in a command string
-    /// 
+    ///
     /// Uses a single-pass algorithm with pre-allocated capacity for better performance.
     /// Supports: {file_path}, {relative_path}, {event_type}, {absolute_path}
     pub fn substitute_template(&self, template: &str) -> String {
         // Pre-allocate with template size + estimated expansion (128 bytes for paths)
         let mut result = String::with_capacity(template.len() + 128);
         let mut last_end = 0;
-        
+
         // Single pass through template looking for placeholders
         let bytes = template.as_bytes();
         let mut i = 0;
-        
+
         while i < bytes.len() {
             if bytes[i] == b'{' {
                 // Found potential placeholder start
                 // Append literal text before placeholder
                 result.push_str(&template[last_end..i]);
-                
+
                 // Find closing brace
                 if let Some(end) = template[i..].find('}') {
                     let placeholder_end = i + end;
                     let placeholder = &template[i + 1..placeholder_end];
-                    
+
                     // Match and substitute placeholder
                     match placeholder {
                         "file_path" => result.push_str(&self.file_path),
@@ -121,7 +121,7 @@ impl TemplateContext {
                             result.push('}');
                         }
                     }
-                    
+
                     last_end = placeholder_end + 1;
                     i = placeholder_end + 1;
                 } else {
@@ -134,7 +134,7 @@ impl TemplateContext {
                 i += 1;
             }
         }
-        
+
         // Append remaining literal text
         result.push_str(&template[last_end..]);
         result
@@ -371,8 +371,7 @@ impl FileWatcher {
         log::debug!("Executing shell command: {}", command);
 
         // Parse command with proper quote handling
-        let parts = shell_words::split(command)
-            .context("Failed to parse command")?;
+        let parts = shell_words::split(command).context("Failed to parse command")?;
         if parts.is_empty() {
             anyhow::bail!("Empty command");
         }
