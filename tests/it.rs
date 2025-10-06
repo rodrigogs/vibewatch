@@ -92,7 +92,7 @@ fn test_cli_verbose_flag_shows_debug_output() {
         .arg(temp_dir.path())
         .arg("--verbose")
         .arg("--on-change")
-        .arg(&common::touch_command("/tmp/vibewatch-test-output.txt"))
+        .arg(common::touch_command("/tmp/vibewatch-test-output.txt"))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
