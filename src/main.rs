@@ -1,6 +1,9 @@
 use clap::Parser;
 use std::path::PathBuf;
 
+// INTENTIONAL SYNTAX ERROR FOR TESTING BRANCH PROTECTION
+this_will_not_compile;
+
 mod filter;
 mod watcher;
 
