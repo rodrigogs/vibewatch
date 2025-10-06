@@ -3,8 +3,7 @@
 //! This file contains ALL integration tests for performance reasons.
 //! Having multiple integration test files causes severe performance problems:
 //! - Each file compiles as a separate binary
-//! - Cargo relinks the library with each file
-//! - Real impact: 3x slower compile, 5x larger artifacts
+//! - Cargo relinks the library with each file: 3x slower compile, 5x larger artifacts
 //!
 //! See: https://matklad.github.io/2021/02/27/delete-cargo-integration-tests.html
 
@@ -250,9 +249,8 @@ fn test_watcher_detects_file_creation() {
     // Create a test file
     common::create_test_file(&temp_dir, "test.txt", "Hello, World!");
 
-    // Wait for detection and command execution
-    thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
+    // Wait for detection and command execution with polling
+    let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
     // Cleanup
     child.kill().expect("Failed to kill vibewatch");
@@ -260,7 +258,7 @@ fn test_watcher_detects_file_creation() {
     // Verify the marker file was created by the command
     // (This proves vibewatch detected the file creation and ran the command)
     assert!(
-        marker_file.path().exists(),
+        marker_exists,
         "Marker file should exist at {}. Vibewatch may not have detected the file creation or executed the command.",
         marker_path
     );
@@ -412,20 +410,20 @@ fn test_filter_exclude_pattern_ignores_matching_files() {
 
     // Create a regular file (should be detected)
     common::create_test_file(&temp_dir, "test.txt", "Regular file");
-    thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
+    
+    // Wait for detection and command execution with polling
+    let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
     // Create a .tmp file (should be ignored)
     common::create_test_file(&temp_dir, "test.tmp", "Temp file");
     thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
 
     child.kill().expect("Failed to kill vibewatch");
 
     // The marker file should exist (from the regular file)
     // This verifies the exclude pattern worked and allowed non-.tmp files
     assert!(
-        marker_file.path().exists(),
+        marker_exists,
         "Marker file should exist from detecting non-.tmp file"
     );
 }
@@ -457,25 +455,24 @@ fn test_filter_multiple_include_patterns() {
 
     // Create a .rs file (should be detected)
     common::create_test_file(&temp_dir, "test.rs", "// Rust");
-    thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
+    
+    // Wait for detection and command execution with polling
+    let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
     // Create a .toml file (should be detected)
     common::create_test_file(&temp_dir, "test.toml", "[package]");
     thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
 
     // Create a .txt file (should be ignored)
     common::create_test_file(&temp_dir, "test.txt", "Text");
     thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
 
     child.kill().expect("Failed to kill vibewatch");
 
     // Should have detected both .rs and .toml files
     // The marker file existence proves the watch worked
     assert!(
-        marker_file.path().exists(),
+        marker_exists,
         "Marker file should exist - both .rs and .toml files should have been detected"
     );
 }
@@ -507,20 +504,20 @@ fn test_filter_combine_include_and_exclude() {
 
     // Create main.rs (should be detected)
     common::create_test_file(&temp_dir, "main.rs", "// Main");
-    thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
+    
+    // Wait for detection and command execution with polling
+    let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
     // Create test.rs (should be excluded)
     common::create_test_file(&temp_dir, "test.rs", "// Test");
     thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
 
     child.kill().expect("Failed to kill vibewatch");
 
     // Should have detected main.rs but not test.rs
     // The marker file existence proves filtering worked correctly
     assert!(
-        marker_file.path().exists(),
+        marker_exists,
         "Marker file should exist - main.rs should have been detected (test.rs excluded)"
     );
 }
@@ -547,14 +544,14 @@ fn test_command_template_substitution_file_path() {
     // Create a test file
     common::create_test_file(&temp_dir, "watched.txt", "content");
 
-    thread::sleep(common::EVENT_DETECTION_TIME);
-    thread::sleep(common::COMMAND_EXECUTION_TIME);
+    // Wait for detection and command execution with polling
+    let output_exists = common::wait_for_file(output_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
     child.kill().expect("Failed to kill vibewatch");
 
     // Verify the command was executed when file was created
     assert!(
-        output_file.path().exists(),
+        output_exists,
         "Output file should exist, proving command with template was executed"
     );
 }

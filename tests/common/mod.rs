@@ -12,6 +12,12 @@ pub const EVENT_DETECTION_TIME: Duration = Duration::from_millis(6000);
 /// Maximum time to wait for a command to complete
 pub const COMMAND_EXECUTION_TIME: Duration = Duration::from_millis(500);
 
+/// Maximum time to wait for marker file creation (polling with retries)
+pub const MARKER_FILE_POLL_TIMEOUT: Duration = Duration::from_millis(10000); // 10 seconds
+
+/// Interval between polls when waiting for marker file
+pub const POLL_INTERVAL: Duration = Duration::from_millis(200); // 200ms
+
 /// Creates a temporary directory for testing
 ///
 /// This directory will be automatically cleaned up when dropped
@@ -48,6 +54,28 @@ pub fn create_test_files(dir: &TempDir, files: &[(&str, &str)]) {
 /// * `new_content` - The new content to write to the file
 pub fn modify_test_file(dir: &TempDir, name: &str, new_content: &str) {
     dir.child(name).write_str(new_content).unwrap();
+}
+
+/// Wait for a file to exist, polling at regular intervals
+///
+/// This is more robust than a single sleep in CI environments where timing is unpredictable.
+///
+/// # Arguments
+/// * `path` - Path to the file to wait for
+/// * `timeout` - Maximum time to wait
+///
+/// # Returns
+/// * `true` if file exists within timeout
+/// * `false` if timeout expires without file appearing
+pub fn wait_for_file(path: &std::path::Path, timeout: Duration) -> bool {
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout {
+        if path.exists() {
+            return true;
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+    false
 }
 
 /// Helper to delete a test file
