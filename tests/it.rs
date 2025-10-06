@@ -92,7 +92,7 @@ fn test_cli_verbose_flag_shows_debug_output() {
         .arg(temp_dir.path())
         .arg("--verbose")
         .arg("--on-change")
-        .arg("touch /tmp/vibewatch-test-output.txt")
+        .arg(&common::touch_command("/tmp/vibewatch-test-output.txt"))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -236,10 +236,10 @@ fn start_watcher_with_command(dir: &assert_fs::TempDir, on_change_cmd: &str) -> 
 fn test_watcher_detects_file_creation() {
     let temp_dir = common::setup_test_dir();
 
-    // Start vibewatch with a command that uses touch (no shell redirection needed)
+    // Start vibewatch with a cross-platform command to create a marker file
     let marker_file = temp_dir.child("marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     let mut child = start_watcher_with_command(&temp_dir, &command);
 
@@ -274,7 +274,7 @@ fn test_watcher_detects_file_modification() {
     // Start vibewatch
     let marker_file = temp_dir.child("modified_marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     let mut child = start_watcher_with_command(&temp_dir, &command);
 
@@ -308,7 +308,7 @@ fn test_watcher_detects_file_deletion() {
     // Start vibewatch
     let marker_file = temp_dir.child("deleted_marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     let mut child = start_watcher_with_command(&temp_dir, &command);
 
@@ -345,7 +345,7 @@ fn test_filter_include_pattern_only_watches_matching_files() {
     let counter_path = counter_file.path().display().to_string();
     // Create initial empty file
     common::create_test_file(&temp_dir, "counter.txt", "");
-    let command = format!("touch {}", counter_path);
+    let command = common::touch_command(&counter_path);
 
     // Only watch .rs files
     let mut child = StdCommand::cargo_bin("vibewatch")
@@ -391,7 +391,7 @@ fn test_filter_exclude_pattern_ignores_matching_files() {
 
     let marker_file = temp_dir.child("marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     // Exclude .tmp files
     let mut child = StdCommand::cargo_bin("vibewatch")
@@ -434,7 +434,7 @@ fn test_filter_multiple_include_patterns() {
 
     let marker_file = temp_dir.child("marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     // Watch both .rs and .toml files
     let mut child = StdCommand::cargo_bin("vibewatch")
@@ -483,7 +483,7 @@ fn test_filter_combine_include_and_exclude() {
 
     let marker_file = temp_dir.child("marker.txt");
     let marker_path = marker_file.path().display().to_string();
-    let command = format!("touch {}", marker_path);
+    let command = common::touch_command(&marker_path);
 
     // Watch .rs files but exclude test.rs
     let mut child = StdCommand::cargo_bin("vibewatch")
@@ -535,7 +535,7 @@ fn test_command_template_substitution_file_path() {
 
     // For now, just test that command execution works with the template
     // Full template substitution testing would require shell features
-    let command = format!("touch {}", output_path);
+    let command = common::touch_command(&output_path);
 
     let mut child = start_watcher_with_command(&temp_dir, &command);
 
@@ -567,9 +567,9 @@ fn test_specific_event_commands() {
     let modify_marker = markers_dir.child("modify_marker.txt");
     let delete_marker = markers_dir.child("delete_marker.txt");
 
-    let create_cmd = format!("touch {}", create_marker.path().display());
-    let modify_cmd = format!("touch {}", modify_marker.path().display());
-    let delete_cmd = format!("touch {}", delete_marker.path().display());
+    let create_cmd = common::touch_command(&create_marker.path().display().to_string());
+    let modify_cmd = common::touch_command(&modify_marker.path().display().to_string());
+    let delete_cmd = common::touch_command(&delete_marker.path().display().to_string());
 
     // Start vibewatch with specific commands for each event type
     let mut child = StdCommand::cargo_bin("vibewatch")

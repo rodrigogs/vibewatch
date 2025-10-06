@@ -18,6 +18,27 @@ pub const MARKER_FILE_POLL_TIMEOUT: Duration = Duration::from_millis(5000); // 5
 /// Interval between polls when waiting for marker file
 pub const POLL_INTERVAL: Duration = Duration::from_millis(100); // 100ms
 
+/// Returns a cross-platform command to create/touch a file
+///
+/// # Arguments
+/// * `path` - The absolute path to the file to create/touch
+///
+/// # Returns
+/// A string command that works on Windows, macOS, and Linux
+pub fn touch_command(path: &str) -> String {
+    if cfg!(target_os = "windows") {
+        // Windows: Use PowerShell's New-Item command which creates file if it doesn't exist
+        // or updates timestamp if it does - equivalent to Unix touch
+        format!(
+            "powershell -Command \"New-Item -ItemType File -Path '{}' -Force | Out-Null\"",
+            path
+        )
+    } else {
+        // Unix (macOS, Linux): Use standard touch command
+        format!("touch {}", path)
+    }
+}
+
 /// Creates a temporary directory for testing
 ///
 /// This directory will be automatically cleaned up when dropped
