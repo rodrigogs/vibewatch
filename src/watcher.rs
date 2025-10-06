@@ -278,9 +278,9 @@ impl FileWatcher {
 
     /// Handle a file system event
     fn handle_event(&self, event: Event) {
-        // DEBUG: Log ALL events to diagnose Windows issue
-        log::debug!(
-            "Raw event received: kind={:?}, paths={:?}",
+        // DEBUG: Use eprintln! to bypass log config and ensure output in tests
+        eprintln!(
+            "[DEBUG] Raw event received: kind={:?}, paths={:?}",
             event.kind,
             event.paths
         );
@@ -295,10 +295,10 @@ impl FileWatcher {
                 notify::event::AccessMode::Write,
             )) => {
                 // These are the events we want to process
-                log::debug!("Event accepted by filter: {:?}", event.kind);
+                eprintln!("[DEBUG] Event ACCEPTED by filter: {:?}", event.kind);
             }
             _ => {
-                log::debug!("Event IGNORED by filter: {:?}", event.kind);
+                eprintln!("[DEBUG] Event IGNORED by filter: {:?}", event.kind);
                 return; // Ignore other event types
             }
         }
