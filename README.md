@@ -7,13 +7,13 @@
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.89.0+-orange.svg)](https://www.rust-lang.org)
 
-A fast and extensible file watcher utility built in Rust with glob pattern support.
+A fast and extensible file watcher utility built in Rust with glob pattern support and cross-platform compatibility.
 
 ## Features
 
 - **Custom command execution**: Run commands on file changes with event-specific triggers (`--on-create`, `--on-modify`, `--on-delete`, `--on-change`)
 - **Template substitution**: Use `{file_path}`, `{relative_path}`, `{absolute_path}`, `{event_type}` in commands
-- **Cross-platform file watching**: Uses the `notify` crate for efficient file system monitoring
+- **Cross-platform file watching**: Fully tested on Linux, macOS, and Windows with platform-specific event handling
 - **Glob pattern support**: Include and exclude files using glob patterns like `*.rs`, `node_modules/**`
 - **Extensible architecture**: Clean separation of concerns for easy feature additions
 - **Fast performance**: Built in Rust for minimal resource usage
