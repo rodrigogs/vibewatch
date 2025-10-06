@@ -13,12 +13,13 @@ A fast and extensible file watcher utility built in Rust with glob pattern suppo
 
 - **Custom command execution**: Run commands on file changes with event-specific triggers (`--on-create`, `--on-modify`, `--on-delete`, `--on-change`)
 - **Template substitution**: Use `{file_path}`, `{relative_path}`, `{absolute_path}`, `{event_type}` in commands
+- **Structured logging**: Objective, timestamp-based logs with exit codes for monitoring and automation
 - **Cross-platform file watching**: Fully tested on Linux, macOS, and Windows with platform-specific event handling
 - **Glob pattern support**: Include and exclude files using glob patterns like `*.rs`, `node_modules/**`
 - **Extensible architecture**: Clean separation of concerns for easy feature additions
 - **Fast performance**: Built in Rust for minimal resource usage
-- **Flexible CLI**: Intuitive command-line interface with verbose logging support
-- **Comprehensive testing**: 95.77% code coverage with 187 tests covering unit, filesystem, and integration scenarios
+- **Flexible CLI**: Intuitive command-line interface with verbose logging and quiet mode
+- **Comprehensive testing**: 90.95% code coverage with 187 tests covering unit, filesystem, and integration scenarios
 
 ## Installation
 
@@ -168,8 +169,41 @@ vibewatch . \
 
 **General:**
 - `-v, --verbose`: Enable verbose output with debug logging
+- `-q, --quiet`: Suppress command output (only show file events and status)
 - `-h, --help`: Show help message
 - `-V, --version`: Show version information
+
+### Structured Logging (v0.4.0+)
+
+vibewatch provides objective, timestamp-based logs for monitoring and automation:
+
+**File Events:**
+```
+[2025-10-06T14:23:15] [CREATED] src/main.rs
+[2025-10-06T14:23:16] [MODIFIED] src/watcher.rs
+[2025-10-06T14:23:17] [DELETED] tmp/test.txt
+```
+
+**Command Execution:**
+```
+[2025-10-06T14:23:15] Executing command: cargo build
+<command output appears here>
+[2025-10-06T14:23:18] Command succeeded (exit code: 0)
+```
+
+**Command Failure:**
+```
+[2025-10-06T14:23:19] Executing command: cargo check
+<error output appears here>
+[2025-10-06T14:23:20] Command failed (exit code: 1)
+```
+
+**Features:**
+- ISO 8601 timestamps for sortable, parseable logs
+- Uppercase event types (CREATED, MODIFIED, DELETED, CHANGED)
+- Exit codes shown for all command executions
+- Grep-friendly format (all lines start with `[YYYY-MM-DD`)
+- Use `--quiet` to suppress command output, keeping only events and status
 
 ## Examples
 
@@ -296,7 +330,7 @@ cargo test --test it  # Integration tests only
 
 ### Code Coverage
 
-The project maintains **95.77% code coverage** (996/1040 lines):
+The project maintains **90.95% code coverage** (1096/1205 lines):
 
 ```bash
 # Generate coverage report
@@ -307,11 +341,11 @@ open target/llvm-cov/html/index.html
 ```
 
 **Coverage by file:**
-- `filter.rs`: 100.00% (190/190) ✅
-- `main.rs`: 98.05% (252/257) ✅
-- `watcher.rs`: 93.42% (554/593) ✅
+- `filter.rs`: 100.00% (177/177) ✅
+- `main.rs`: 97.67% (252/258) ✅
+- `watcher.rs`: 86.62% (667/770) ✅
 
-> **Note:** The remaining 4.23% uncovered lines are in `main()` and `start_watching()` functions that run as subprocesses during integration tests. Coverage tools cannot track across process boundaries. These lines are functionally tested through our comprehensive integration test suite.
+> **Note:** The watcher.rs coverage is lower due to command execution happening in spawned async tasks that are harder to test in unit tests. All command execution logic is thoroughly tested through our comprehensive integration test suite.
 
 ### Development Commands
 
@@ -368,7 +402,7 @@ Releases are fully automated via [Release Please](https://github.com/googleapis/
      * Windows x64
    - Publish to crates.io (requires `CARGO_TOKEN` secret)
 
-**Current version**: v0.3.0 (October 2025)
+**Current version**: v0.4.0 (October 2025)
 
 **Binary build tool**: Uses `taiki-e/upload-rust-binary-action` for reliable cross-compilation
 - Automatic cross-compilation for Linux ARM64
@@ -389,6 +423,11 @@ All PRs and pushes to `master` run:
 - ✅ Build binaries for 5 platforms (parallel)
 - ✅ Create GitHub Release with all binaries
 - ✅ Publish to crates.io
+
+**Release Process**:
+- Uses Release Please with Personal Access Token (`RELEASE_PLEASE_TOKEN`)
+- PAT required to trigger CI workflows on Release Please PRs
+- Ensures all tests pass before releases are created
 
 See [`docs/CI_CD.md`](docs/CI_CD.md) for complete CI/CD architecture documentation.
 

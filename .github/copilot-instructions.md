@@ -61,11 +61,11 @@ cargo test -- --nocapture --test-threads=1  # Debug with output
 
 ## Coverage Philosophy (Non-Negotiable)
 
-**95.77% coverage is EXCELLENT and accepted.** Remaining 4.23% is in:
-- `main()` function (lines 82-85, 97, 101) - subprocess limitation
-- `start_watching()` event loop (lines 139-159) - subprocess limitation
+**90.95% coverage is EXCELLENT and accepted.** The watcher.rs coverage (86.62%) is lower due to:
+- Command execution in spawned async tasks (harder to test in unit tests)
+- Event loop logic in subprocess (coverage tools can't track across process boundaries)
 
-**Do NOT refactor architecture to chase 100% coverage.** These lines are functionally tested via integration tests. Subprocess execution is the correct approach per Rust testing best practices.
+**Do NOT refactor architecture to chase 100% coverage.** These lines are functionally tested via integration tests. Subprocess execution and async task spawning are the correct approaches per Rust best practices.
 
 ## Parameterized Testing Pattern
 
@@ -187,6 +187,13 @@ feat!: change CLI argument structure (BREAKING CHANGE)
 - ✅ Migrated to taiki-e action for reliability
 - ✅ All 5 platform binaries build successfully
 - ✅ No timeouts, ~4 minute total build time
+
+**v0.4.0** (October 2025): Logging improvements and CI fix
+- ✅ Structured, objective logging with ISO 8601 timestamps
+- ✅ Command exit codes displayed (succeeded/failed)
+- ✅ Added `--quiet` flag to suppress command output
+- ✅ Fixed Release Please to use PAT token for CI workflow triggers
+- ✅ All CI checks now run automatically on release PRs
 
 ### CI/CD Pipeline
 

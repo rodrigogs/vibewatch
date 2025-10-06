@@ -4,7 +4,12 @@
 
 This document describes the CI/CD architecture for vibewatch, which automates releases while ensuring code quality through branch protection and comprehensive testing.
 
-**Status**: ✅ Fully implemented and operational as of v0.3.0 (October 2025)
+**Status**: ✅ Fully implemented and operational as of v0.4.0 (October 2025)
+
+**Recent Updates (v0.4.0)**:
+- ✅ Fixed CI workflow triggering on Release Please PRs using Personal Access Token
+- ✅ Added structured logging with timestamps and exit codes
+- ✅ Added `--quiet` flag for output control
 
 ## Current Implementation
 
@@ -214,30 +219,39 @@ To verify status check names:
 
 ## Token Configuration
 
-### GITHUB_TOKEN (Current)
+### RELEASE_PLEASE_TOKEN (Configured - v0.4.0+)
 
-The workflow currently uses `GITHUB_TOKEN`:
+**Status**: ✅ Configured and working as of v0.4.0
+
+The workflow uses a Personal Access Token to trigger CI workflows on Release Please PRs:
 ```yaml
-token: ${{ secrets.GITHUB_TOKEN }}
+token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 ```
 
-**Status**: ✅ Working correctly for current workflow needs
+**Why PAT is Required**:
 
-**Limitation**: From GitHub documentation:
+From GitHub documentation:
 > When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run.
 
-**Impact**: If you add workflows that should trigger on `release.created` events, they won't run with `GITHUB_TOKEN`.
+This means:
+- Release Please PRs created with `GITHUB_TOKEN` don't trigger CI workflows
+- CI checks show as "Expected — Waiting for status to be reported" but never run
+- Manual intervention required to verify code before merging
 
-### Personal Access Token (Optional Upgrade)
+**Solution**: Use a Personal Access Token with `repo` and `workflow` scopes
 
-**When to upgrade**: Only if you need workflows that trigger on Release Please's actions (e.g., deploy on release, notify on release).
-
-**Setup**:
+**Setup** (already configured):
 1. Go to GitHub Settings → Developer settings → Personal access tokens
 2. Generate new token (classic)
-3. Scopes: `repo` (Full control of private repositories)
+3. Required scopes: `repo` and `workflow`
 4. Add as repository secret: `RELEASE_PLEASE_TOKEN`
 5. Update `release.yml`: `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`
+
+**Benefits**:
+- ✅ CI workflows automatically run on Release Please PRs
+- ✅ All 6 required status checks execute before merging
+- ✅ No manual intervention needed to verify code
+- ✅ Ensures tested code is released
 
 ### CARGO_TOKEN (Configured)
 
