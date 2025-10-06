@@ -2,21 +2,21 @@ use assert_fs::TempDir;
 use assert_fs::prelude::*;
 use std::time::Duration;
 
-/// Time allowed for watcher to start and initialize (6 seconds for CI stability)
-pub const WATCHER_STARTUP_TIME: Duration = Duration::from_millis(6000);
+/// Time allowed for watcher to start and initialize (2 seconds - reduced after fixing event handling)
+pub const WATCHER_STARTUP_TIME: Duration = Duration::from_millis(2000);
 
-/// Time allowed for watcher to detect and process filesystem events (6 seconds for CI)
-pub const EVENT_DETECTION_TIME: Duration = Duration::from_millis(6000);
+/// Time allowed for watcher to detect and process filesystem events (2 seconds)
+pub const EVENT_DETECTION_TIME: Duration = Duration::from_millis(2000);
 
 /// Timeout for command execution
 /// Maximum time to wait for a command to complete
 pub const COMMAND_EXECUTION_TIME: Duration = Duration::from_millis(500);
 
 /// Maximum time to wait for marker file creation (polling with retries)
-pub const MARKER_FILE_POLL_TIMEOUT: Duration = Duration::from_millis(10000); // 10 seconds
+pub const MARKER_FILE_POLL_TIMEOUT: Duration = Duration::from_millis(5000); // 5 seconds
 
 /// Interval between polls when waiting for marker file
-pub const POLL_INTERVAL: Duration = Duration::from_millis(200); // 200ms
+pub const POLL_INTERVAL: Duration = Duration::from_millis(100); // 100ms
 
 /// Creates a temporary directory for testing
 ///

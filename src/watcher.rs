@@ -279,8 +279,12 @@ impl FileWatcher {
     /// Handle a file system event
     fn handle_event(&self, event: Event) {
         // Filter out events we don't care about
+        // Note: On Linux, inotify sends Access(Close(Write)) for file writes, which we treat as Modify
         match event.kind {
-            EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
+            EventKind::Create(_) 
+            | EventKind::Modify(_) 
+            | EventKind::Remove(_) 
+            | EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
                 // These are the events we want to process
             }
             _ => return, // Ignore other event types
@@ -291,15 +295,23 @@ impl FileWatcher {
             if let Some(relative_path) = self.get_relative_path(&path)
                 && self.filter.should_watch(&relative_path)
             {
-                // Check for special case: Modify(Name(Any)) might be a deletion from GUI applications
+                // Normalize event kinds for cross-platform consistency
+                // On Linux, inotify sends Access(Close(Write)) for file writes, treat as Modify
+                let normalized_modify = EventKind::Modify(notify::event::ModifyKind::Data(notify::event::DataChange::Any));
+                let normalized_remove = EventKind::Remove(notify::event::RemoveKind::File);
+                
                 let final_event_kind = match &event.kind {
                     EventKind::Modify(notify::event::ModifyKind::Name(_)) => {
                         // If the file no longer exists, treat this as a deletion
                         if !path.exists() {
-                            &EventKind::Remove(notify::event::RemoveKind::File)
+                            &normalized_remove
                         } else {
                             &event.kind
                         }
+                    }
+                    EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
+                        // Treat Close(Write) as Modify for command execution
+                        &normalized_modify
                     }
                     _ => &event.kind,
                 };
