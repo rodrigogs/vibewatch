@@ -103,9 +103,7 @@ PatternFilter::new(include, exclude)
 ## Documentation Structure
 
 - `README.md` - User-facing, usage examples, architecture overview
-- `docs/TESTING.md` - Test organization, techniques, CI/CD patterns
-- `docs/COVERAGE.md` - Coverage analysis, uncovered lines explanation, benchmarks
-- `docs/INTEGRATION_TEST.md` - Research notes, rationale for single test file
+- `docs/CI_CD.md` - Complete CI/CD architecture, release process, branch protection (v2.0 as of v0.3.0)
 
 **Keep docs synchronized** - coverage percentages, test counts, line numbers must match reality.
 
@@ -151,16 +149,44 @@ docs: update README with new examples
 feat!: change CLI argument structure (BREAKING CHANGE)
 ```
 
-### Release Workflow
+### Release Workflow (v0.3.0+ Implementation)
 
 1. **Commit to `master`** using conventional commits
 2. **Release Please creates PR** - Automatically updates `CHANGELOG.md` and `Cargo.toml` version
-3. **Merge the Release PR** - Triggers:
+3. **Merge the Release PR** (requires admin due to branch protection) - Triggers:
    - GitHub Release creation with release notes
-   - Binary builds (Linux x86_64/ARM64, macOS x86_64/ARM64, Windows x86_64)
-   - Optional publish to crates.io (requires `CARGO_TOKEN` secret)
+   - **Binary builds for 5 platforms** (parallel execution, ~4 minutes total):
+     * Linux x86_64 (`x86_64-unknown-linux-gnu`) - native build
+     * Linux ARM64 (`aarch64-unknown-linux-gnu`) - cross-compilation via `cross` tool
+     * macOS Intel (`x86_64-apple-darwin`) - native build
+     * macOS ARM (`aarch64-apple-darwin`) - native build
+     * Windows x64 (`x86_64-pc-windows-msvc`) - native build
+   - Publish to crates.io (requires `CARGO_TOKEN` secret)
 
 **Never manually edit** `CHANGELOG.md` or version in `Cargo.toml` - Release Please manages these.
+
+**Binary Build Tool**: Uses `taiki-e/upload-rust-binary-action@v1` (reliable, battle-tested by tokio-console and cargo-hack)
+- Automatic cross-compilation for Linux ARM64
+- Proper archive formats (.tar.gz for Unix, .zip for Windows)
+- No manual build/strip/rename steps needed
+- No timeout issues (resolved in v0.3.0)
+
+### Release History Context
+
+**v0.2.0 and earlier**: Manual cross-compilation with apt packages
+- ❌ Frequent timeouts in GitHub Actions
+- ❌ Complex manual build/strip/rename/upload steps
+
+**v0.2.1** (October 2025): Quick fix
+- ⚠️ Removed Linux builds temporarily to fix timeouts
+- ✅ Released with 3 binaries (macOS x2, Windows)
+- Linux users used `cargo install vibewatch`
+
+**v0.3.0** (October 2025): Permanent solution
+- ✅ Restored Linux support (x86_64 + ARM64)
+- ✅ Migrated to taiki-e action for reliability
+- ✅ All 5 platform binaries build successfully
+- ✅ No timeouts, ~4 minute total build time
 
 ### CI/CD Pipeline
 
@@ -171,8 +197,15 @@ feat!: change CLI argument structure (BREAKING CHANGE)
 - ✅ Coverage generation (uploaded to Codecov)
 
 **Workflow files:**
-- `.github/workflows/ci.yml` - Continuous integration checks
-- `.github/workflows/release.yml` - Automated releases and binary publishing
+- `.github/workflows/ci.yml` - Continuous integration checks (6 required status checks)
+- `.github/workflows/release.yml` - Automated releases and binary publishing (5 platforms)
+
+**Branch Protection:**
+- Enabled on `master` branch with strict mode
+- All 6 CI checks must pass before merge
+- PRs must be up-to-date with base branch
+- Linear history enforced (squash-merge)
+- Admin bypass available for emergencies
 
 ## When Adding Features
 
