@@ -41,24 +41,26 @@ jobs:
         continue-on-error: true
 
   build-binaries:
-    name: Build Release Binaries
+    name: Build and Upload Binaries
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # macOS binaries
+          # Linux binaries (x86_64 and aarch64) - uses cross for aarch64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          # macOS binaries (Intel and Apple Silicon)
           - target: x86_64-apple-darwin
             os: macos-latest
-            name: vibewatch-macos-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: vibewatch-macos-aarch64
           # Windows binary
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: vibewatch-windows-x86_64.exe
-          # Linux users can install via: cargo install vibewatch
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -66,25 +68,19 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross (for Linux ARM cross-compilation)
+        if: matrix.os == 'ubuntu-latest' && matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: taiki-e/install-action@v2
         with:
-          targets: ${{ matrix.target }}
+          tool: cross
 
-      - name: Build binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
-        run: strip target/${{ matrix.target }}/release/vibewatch
-
-      - name: Rename binary (Unix)
-        if: runner.os != 'Windows'
-        run: mv target/${{ matrix.target }}/release/vibewatch ${{ matrix.name }}
-
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        run: mv target/${{ matrix.target }}/release/vibewatch.exe ${{ matrix.name }}
-
-      - name: Upload binary to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ needs.release-please.outputs.tag_name }} ${{ matrix.name }}
+      - name: Build and upload binary
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: vibewatch
+          target: ${{ matrix.target }}
+          tar: unix
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: refs/tags/${{ needs.release-please.outputs.tag_name }}
