@@ -47,24 +47,18 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: vibewatch-linux-x86_64
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: vibewatch-linux-x86_64-musl
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: vibewatch-linux-aarch64
+          # macOS binaries
           - target: x86_64-apple-darwin
             os: macos-latest
             name: vibewatch-macos-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
             name: vibewatch-macos-aarch64
+          # Windows binary
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             name: vibewatch-windows-x86_64.exe
+          # Linux users can install via: cargo install vibewatch
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -74,15 +68,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
-      - name: Install cross-compilation tools (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-          fi
 
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
