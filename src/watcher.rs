@@ -281,8 +281,7 @@ impl FileWatcher {
         // DEBUG: Use eprintln! to bypass log config and ensure output in tests
         eprintln!(
             "[DEBUG] Raw event received: kind={:?}, paths={:?}",
-            event.kind,
-            event.paths
+            event.kind, event.paths
         );
 
         // Filter out events we don't care about
