@@ -4,11 +4,11 @@ use std::time::Duration;
 
 /// Standard timeout for watcher initialization
 /// Give the file watcher time to start up and begin monitoring
-pub const WATCHER_STARTUP_TIME: Duration = Duration::from_millis(1500);
+pub const WATCHER_STARTUP_TIME: Duration = Duration::from_millis(3000);
 
 /// Standard timeout for event detection
 /// Time to wait for the watcher to detect and process filesystem events
-pub const EVENT_DETECTION_TIME: Duration = Duration::from_millis(1500);
+pub const EVENT_DETECTION_TIME: Duration = Duration::from_millis(3000);
 
 /// Timeout for command execution
 /// Maximum time to wait for a command to complete

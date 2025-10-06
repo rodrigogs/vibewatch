@@ -21,7 +21,9 @@ anyhow = "1.0"
 log = "0.4"
 env_logger = "0.11"
 # Async runtime for command execution
-tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "time", "sync"] }
+tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "time", "sync", "signal"] }
+# Shell-like command parsing with quote support
+shell-words = "1.1"
 
 [dev-dependencies]
 # Mocking framework
@@ -40,3 +42,17 @@ assert_cmd = "2"
 assert_fs = "1"
 # Advanced assertions for testing
 predicates = "3"
+# Benchmarking framework
+criterion = "0.5"
+
+[[bench]]
+name = "template_substitution"
+harness = false
+
+[[bench]]
+name = "path_normalization"
+harness = false
+
+[[bench]]
+name = "pattern_matching"
+harness = false

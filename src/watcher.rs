@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
+use tokio::sync::mpsc;
 
 use crate::filter::PatternFilter;
 
@@ -34,7 +34,7 @@ impl CommandConfig {
 pub(crate) struct TemplateContext {
     file_path: String,
     relative_path: String,
-    event_type: String,
+    event_type: &'static str,
     absolute_path: String,
 }
 
@@ -48,29 +48,96 @@ impl TemplateContext {
         let absolute_path = watch_path.join(relative_path);
         // Normalize all paths to use forward slashes for cross-platform consistency
         Self {
-            file_path: file_path.display().to_string().replace('\\', "/"),
-            relative_path: relative_path.display().to_string().replace('\\', "/"),
-            event_type: Self::event_kind_to_string(event_kind),
-            absolute_path: absolute_path.display().to_string().replace('\\', "/"),
+            file_path: Self::normalize_path(file_path),
+            relative_path: Self::normalize_path(relative_path),
+            event_type: Self::event_kind_to_str(event_kind),
+            absolute_path: Self::normalize_path(&absolute_path),
         }
     }
 
-    pub fn event_kind_to_string(event_kind: &EventKind) -> String {
+    /// Normalize path to use forward slashes
+    ///
+    /// On Unix systems, avoids string replacement (just converts to string).
+    /// On Windows, replaces backslashes with forward slashes.
+    ///
+    /// Performance: On Unix/macOS (no backslashes), this is a simple to_string().
+    /// On Windows (has backslashes), performs replace operation.
+    fn normalize_path(path: &Path) -> String {
+        let path_str = path.display().to_string();
+
+        // Check if path contains backslashes (Windows-specific)
+        if path_str.contains('\\') {
+            // Windows: need to replace backslashes
+            path_str.replace('\\', "/")
+        } else {
+            // Unix/macOS: no backslashes, return as-is
+            path_str
+        }
+    }
+
+    pub fn event_kind_to_str(event_kind: &EventKind) -> &'static str {
         match event_kind {
-            EventKind::Create(_) => "create".to_string(),
-            EventKind::Modify(_) => "modify".to_string(),
-            EventKind::Remove(_) => "delete".to_string(),
-            _ => "change".to_string(),
+            EventKind::Create(_) => "create",
+            EventKind::Modify(_) => "modify",
+            EventKind::Remove(_) => "delete",
+            _ => "change",
         }
     }
 
     /// Substitute template variables in a command string
+    ///
+    /// Uses a single-pass algorithm with pre-allocated capacity for better performance.
+    /// Supports: {file_path}, {relative_path}, {event_type}, {absolute_path}
     pub fn substitute_template(&self, template: &str) -> String {
-        template
-            .replace("{file_path}", &self.file_path)
-            .replace("{relative_path}", &self.relative_path)
-            .replace("{event_type}", &self.event_type)
-            .replace("{absolute_path}", &self.absolute_path)
+        // Pre-allocate with template size + estimated expansion (128 bytes for paths)
+        let mut result = String::with_capacity(template.len() + 128);
+        let mut last_end = 0;
+
+        // Single pass through template looking for placeholders
+        let bytes = template.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            if bytes[i] == b'{' {
+                // Found potential placeholder start
+                // Append literal text before placeholder
+                result.push_str(&template[last_end..i]);
+
+                // Find closing brace
+                if let Some(end) = template[i..].find('}') {
+                    let placeholder_end = i + end;
+                    let placeholder = &template[i + 1..placeholder_end];
+
+                    // Match and substitute placeholder
+                    match placeholder {
+                        "file_path" => result.push_str(&self.file_path),
+                        "relative_path" => result.push_str(&self.relative_path),
+                        "event_type" => result.push_str(self.event_type),
+                        "absolute_path" => result.push_str(&self.absolute_path),
+                        _ => {
+                            // Unknown placeholder - keep as-is
+                            result.push('{');
+                            result.push_str(placeholder);
+                            result.push('}');
+                        }
+                    }
+
+                    last_end = placeholder_end + 1;
+                    i = placeholder_end + 1;
+                } else {
+                    // No closing brace - keep the opening brace
+                    result.push('{');
+                    last_end = i + 1;
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+
+        // Append remaining literal text
+        result.push_str(&template[last_end..]);
+        result
     }
 }
 
@@ -117,8 +184,8 @@ impl FileWatcher {
     }
 
     /// Start watching for file changes
-    pub fn start_watching(&mut self) -> Result<()> {
-        let (tx, rx) = mpsc::channel();
+    pub async fn start_watching(&mut self) -> Result<()> {
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Create watcher with recommended configuration
         let mut watcher = RecommendedWatcher::new(
@@ -147,34 +214,47 @@ impl FileWatcher {
         let mut pending_events: HashMap<PathBuf, (Event, Instant)> = HashMap::new();
         let debounce_duration = Duration::from_millis(self.debounce_ms);
 
-        // Process events in main thread with debouncing
-        loop {
-            // Calculate timeout: either 100ms for checking pending events or remaining debounce time
-            let timeout = if pending_events.is_empty() {
-                Duration::from_secs(1)
-            } else {
-                Duration::from_millis(50) // Check more frequently when events are pending
-            };
+        // Create ticker for checking pending events
+        let check_interval = if self.debounce_ms > 0 {
+            Duration::from_millis(50) // Check frequently when debouncing enabled
+        } else {
+            Duration::from_secs(3600) // Rarely check when debouncing disabled
+        };
+        let mut ticker = tokio::time::interval(check_interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-            match rx.recv_timeout(timeout) {
-                Ok(Ok(event)) => {
-                    if self.debounce_ms == 0 {
-                        // No debouncing - process immediately
-                        self.handle_event(event);
-                    } else {
-                        // Debouncing enabled - track events
-                        for path in &event.paths {
-                            pending_events.insert(path.clone(), (event.clone(), Instant::now()));
-                            log::debug!("Debouncing event for: {}", path.display());
+        // Process events asynchronously with graceful shutdown
+        loop {
+            tokio::select! {
+                // Handle Ctrl+C for graceful shutdown
+                _ = tokio::signal::ctrl_c() => {
+                    log::info!("Received Ctrl+C, shutting down gracefully...");
+                    println!("\n👋 Shutting down vibewatch...");
+                    break;
+                }
+                // Receive file system events
+                Some(res) = rx.recv() => {
+                    match res {
+                        Ok(event) => {
+                            if self.debounce_ms == 0 {
+                                // No debouncing - process immediately
+                                self.handle_event(event);
+                            } else {
+                                // Debouncing enabled - track events
+                                for path in &event.paths {
+                                    pending_events.insert(path.clone(), (event.clone(), Instant::now()));
+                                    log::debug!("Debouncing event for: {}", path.display());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Watch error: {}", e);
                         }
                     }
                 }
-                Ok(Err(e)) => {
-                    log::error!("Watch error: {}", e);
-                }
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    // Check for events that have exceeded debounce period
-                    if self.debounce_ms > 0 {
+                // Check for events ready to process (exceeded debounce period)
+                _ = ticker.tick() => {
+                    if self.debounce_ms > 0 && !pending_events.is_empty() {
                         let now = Instant::now();
                         let ready_paths: Vec<PathBuf> = pending_events
                             .iter()
@@ -189,11 +269,6 @@ impl FileWatcher {
                             }
                         }
                     }
-                    continue;
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    log::info!("Watcher channel disconnected");
-                    break;
                 }
             }
         }
@@ -295,13 +370,13 @@ impl FileWatcher {
     async fn execute_shell_command(command: &str) -> Result<std::process::Output> {
         log::debug!("Executing shell command: {}", command);
 
-        // Split command into program and args (simple parsing)
-        let parts: Vec<&str> = command.split_whitespace().collect();
+        // Parse command with proper quote handling
+        let parts = shell_words::split(command).context("Failed to parse command")?;
         if parts.is_empty() {
             anyhow::bail!("Empty command");
         }
 
-        let program = parts[0];
+        let program = &parts[0];
         let args = &parts[1..];
 
         let output = TokioCommand::new(program)
@@ -703,23 +778,21 @@ mod tests {
     #[test]
     fn test_event_kind_to_string_all_types() {
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Create(CreateKind::File)),
+            TemplateContext::event_kind_to_str(&EventKind::Create(CreateKind::File)),
             "create"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Modify(ModifyKind::Data(
+            TemplateContext::event_kind_to_str(&EventKind::Modify(ModifyKind::Data(
                 notify::event::DataChange::Any
             ))),
             "modify"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Remove(RemoveKind::File)),
+            TemplateContext::event_kind_to_str(&EventKind::Remove(RemoveKind::File)),
             "delete"
         );
         assert_eq!(
-            TemplateContext::event_kind_to_string(&EventKind::Access(
-                notify::event::AccessKind::Any
-            )),
+            TemplateContext::event_kind_to_str(&EventKind::Access(notify::event::AccessKind::Any)),
             "change"
         );
     }
@@ -969,7 +1042,7 @@ mod tests {
     fn test_event_kind_to_string_conversion(#[case] event_kind: EventKind, #[case] expected: &str) {
         assert_eq!(
             expected,
-            TemplateContext::event_kind_to_string(&event_kind),
+            TemplateContext::event_kind_to_str(&event_kind),
             "EventKind {:?} should convert to '{}'",
             event_kind,
             expected

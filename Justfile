@@ -94,6 +94,26 @@ install-tools:
 demo:
     cargo run -- src --include "*.rs" --verbose --on-change "echo Changed: {relative_path}"
 
+# Run all benchmarks
+bench:
+    cargo bench
+
+# Run specific benchmark
+bench-one NAME:
+    cargo bench --bench {{NAME}}
+
+# Run benchmarks and save as baseline
+bench-baseline NAME="main":
+    cargo bench -- --save-baseline {{NAME}}
+
+# Compare benchmarks against baseline
+bench-compare NAME="main":
+    cargo bench -- --baseline {{NAME}}
+
+# Run quick benchmark test (doesn't do full measurement)
+bench-test:
+    cargo bench -- --test
+
 # Show project statistics
 stats:
     @echo "=== Project Statistics ==="
@@ -101,9 +121,9 @@ stats:
     @find src -name "*.rs" | wc -l
     @echo "Test files:"
     @find tests -name "*.rs" | wc -l
+    @echo "Benchmark files:"
+    @find benches -name "*.rs" | wc -l
     @echo "Lines of code (src):"
     @find src -name "*.rs" -exec wc -l {} + | tail -1
     @echo "Lines of code (tests):"
     @find tests -name "*.rs" -exec wc -l {} + | tail -1
-    @echo "Total documentation:"
-    @find docs -name "*.md" -exec wc -l {} + | tail -1
