@@ -410,7 +410,7 @@ fn test_filter_exclude_pattern_ignores_matching_files() {
 
     // Create a regular file (should be detected)
     common::create_test_file(&temp_dir, "test.txt", "Regular file");
-    
+
     // Wait for detection and command execution with polling
     let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
@@ -455,7 +455,7 @@ fn test_filter_multiple_include_patterns() {
 
     // Create a .rs file (should be detected)
     common::create_test_file(&temp_dir, "test.rs", "// Rust");
-    
+
     // Wait for detection and command execution with polling
     let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
@@ -504,7 +504,7 @@ fn test_filter_combine_include_and_exclude() {
 
     // Create main.rs (should be detected)
     common::create_test_file(&temp_dir, "main.rs", "// Main");
-    
+
     // Wait for detection and command execution with polling
     let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
 
