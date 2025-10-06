@@ -278,6 +278,13 @@ impl FileWatcher {
 
     /// Handle a file system event
     fn handle_event(&self, event: Event) {
+        // DEBUG: Log ALL events to diagnose Windows issue
+        log::debug!(
+            "Raw event received: kind={:?}, paths={:?}",
+            event.kind,
+            event.paths
+        );
+
         // Filter out events we don't care about
         // Note: On Linux, inotify sends Access(Close(Write)) for file writes, which we treat as Modify
         match event.kind {
@@ -288,8 +295,12 @@ impl FileWatcher {
                 notify::event::AccessMode::Write,
             )) => {
                 // These are the events we want to process
+                log::debug!("Event accepted by filter: {:?}", event.kind);
             }
-            _ => return, // Ignore other event types
+            _ => {
+                log::debug!("Event IGNORED by filter: {:?}", event.kind);
+                return; // Ignore other event types
+            }
         }
 
         // Process each path in the event
