@@ -28,9 +28,26 @@ A fast and extensible file watcher utility built in Rust with glob pattern suppo
 cargo install vibewatch
 ```
 
-### From Binary Releases
+### From Binary Releases (Recommended for Production)
 
-Download pre-built binaries for Linux, macOS, or Windows from the [latest release](https://github.com/rodrigogs/vibewatch/releases/latest).
+Download pre-built binaries from the [latest release](https://github.com/rodrigogs/vibewatch/releases/latest).
+
+**Available platforms:**
+- **Linux**: x86_64, ARM64 (`.tar.gz`)
+- **macOS**: Intel (x86_64), Apple Silicon (ARM64) (`.tar.gz`)
+- **Windows**: x64 (`.zip`)
+
+```bash
+# Example: Linux x86_64
+wget https://github.com/rodrigogs/vibewatch/releases/latest/download/vibewatch-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf vibewatch-x86_64-unknown-linux-gnu.tar.gz
+sudo mv vibewatch /usr/local/bin/
+
+# Example: macOS ARM (Apple Silicon)
+wget https://github.com/rodrigogs/vibewatch/releases/latest/download/vibewatch-aarch64-apple-darwin.tar.gz
+tar -xzf vibewatch-aarch64-apple-darwin.tar.gz
+sudo mv vibewatch /usr/local/bin/
+```
 
 ### From Source
 
@@ -45,12 +62,13 @@ cargo build --release
 
 ## ⚡ Performance
 
-vibewatch v0.2.0 includes significant performance optimizations:
+vibewatch includes significant performance optimizations:
 
 - **40-60% fewer memory allocations** through static strings and optimized path handling
 - **15-30% faster event processing** via async channels (tokio)
 - **80-95% fewer redundant commands** with intelligent event debouncing
 - **Proper shell parsing** with quote support via shell-words crate
+- **Fast binary builds** - Reliable cross-platform compilation (~4 minutes for 5 platforms)
 
 ### Benchmarks
 
@@ -65,8 +83,6 @@ The benchmark suite includes:
 - **Template substitution** - Single-pass vs multi-pass string operations
 - **Path normalization** - Platform-specific optimization validation  
 - **Pattern matching** - Glob compilation and matching performance
-
-See commit messages for detailed optimization rationale.
 
 ## Usage
 
@@ -340,32 +356,47 @@ feat!: change CLI argument structure (breaking change)
 
 ### Release Process
 
-Releases are automated via [Release Please](https://github.com/googleapis/release-please):
+Releases are fully automated via [Release Please](https://github.com/googleapis/release-please):
 
 1. **Commit using conventional commits** - Each commit to `master` is analyzed
 2. **Release PR is created** - Release Please opens a PR with updated version and CHANGELOG
 3. **Merge the Release PR** - This triggers:
-   - GitHub Release creation
-   - Binary builds for Linux, macOS, Windows (x86_64, ARM64)
-   - Optional publish to crates.io (if `CARGO_TOKEN` secret is configured)
+   - GitHub Release creation with release notes
+   - **Binary builds for 5 platforms** (parallel execution, ~4 minutes):
+     * Linux x86_64 and ARM64
+     * macOS Intel and Apple Silicon
+     * Windows x64
+   - Publish to crates.io (requires `CARGO_TOKEN` secret)
 
-**Manual release**: Just merge the automatically created "chore: release X.Y.Z" PR.
+**Current version**: v0.3.0 (October 2025)
 
-**Setup Required**: Release Please needs a Personal Access Token to create PRs. See [`docs/RELEASE_PLEASE_SETUP.md`](docs/RELEASE_PLEASE_SETUP.md) for detailed setup instructions.
+**Binary build tool**: Uses `taiki-e/upload-rust-binary-action` for reliable cross-compilation
+- Automatic cross-compilation for Linux ARM64
+- No timeout issues (resolved in v0.3.0)
+- Battle-tested by tokio-console and cargo-hack
 
 ### CI/CD
+
+**Branch Protection**: Enabled on `master` with 6 required status checks
 
 All PRs and pushes to `master` run:
 - ✅ Tests (187 tests on Linux, macOS, Windows)
 - ✅ Formatting check (`cargo fmt --check`)
-- ✅ Linting (`cargo clippy`)
+- ✅ Linting (`cargo clippy -D warnings`)
 - ✅ Coverage report (uploaded to Codecov)
+
+**On release** (after merging Release PR):
+- ✅ Build binaries for 5 platforms (parallel)
+- ✅ Create GitHub Release with all binaries
+- ✅ Publish to crates.io
+
+See [`docs/CI_CD.md`](docs/CI_CD.md) for complete CI/CD architecture documentation.
 
 ## Documentation
 
 For comprehensive technical documentation:
-- **Release Please Setup**: [`docs/RELEASE_PLEASE_SETUP.md`](docs/RELEASE_PLEASE_SETUP.md) - Configure automated releases with PAT
-- **Testing Guide**: `docs/TESTING.md` - Test organization, best practices, and quick reference
-- **Coverage Analysis**: `docs/COVERAGE.md` - Detailed coverage metrics and industry benchmarks
-- **Integration Tests**: `docs/INTEGRATION_TEST.md` - Testing research, rationale, and best practices
-- **Justfile Guide**: `docs/JUSTFILE_IMPLEMENTATION.md` - Task runner implementation and benefits
+- **CI/CD Architecture**: [`docs/CI_CD.md`](docs/CI_CD.md) - Complete CI/CD pipeline, release process, branch protection (v2.0)
+- **Testing Guide**: [`docs/TESTING.md`](docs/TESTING.md) - Test organization, best practices, and quick reference
+- **Coverage Analysis**: [`docs/COVERAGE.md`](docs/COVERAGE.md) - Detailed coverage metrics and industry benchmarks
+- **Integration Tests**: [`docs/INTEGRATION_TEST.md`](docs/INTEGRATION_TEST.md) - Testing research, rationale, and best practices
+- **Justfile Guide**: [`docs/JUSTFILE_IMPLEMENTATION.md`](docs/JUSTFILE_IMPLEMENTATION.md) - Task runner implementation and benefits
