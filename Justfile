@@ -127,5 +127,3 @@ stats:
     @find src -name "*.rs" -exec wc -l {} + | tail -1
     @echo "Lines of code (tests):"
     @find tests -name "*.rs" -exec wc -l {} + | tail -1
-    @echo "Total documentation:"
-    @find docs -name "*.md" -exec wc -l {} + | tail -1
