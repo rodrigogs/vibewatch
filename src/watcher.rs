@@ -148,6 +148,8 @@ pub struct FileWatcher {
     filter: PatternFilter,
     command_config: CommandConfig,
     debounce_ms: u64,
+    verbose: bool,
+    quiet: bool,
 }
 
 impl FileWatcher {
@@ -158,6 +160,8 @@ impl FileWatcher {
         exclude_patterns: Vec<String>,
         command_config: CommandConfig,
         debounce_ms: u64,
+        verbose: bool,
+        quiet: bool,
     ) -> Result<Self> {
         // Ensure the watch path exists
         if !watch_path.exists() {
@@ -180,6 +184,8 @@ impl FileWatcher {
             filter,
             command_config,
             debounce_ms,
+            verbose,
+            quiet,
         })
     }
 
@@ -278,10 +284,10 @@ impl FileWatcher {
 
     /// Handle a file system event
     fn handle_event(&self, event: Event) {
-        // DEBUG: Use eprintln! to bypass log config and ensure output in tests
-        eprintln!(
-            "[DEBUG] Raw event received: kind={:?}, paths={:?}",
-            event.kind, event.paths
+        log::debug!(
+            "Raw event received: kind={:?}, paths={:?}",
+            event.kind,
+            event.paths
         );
 
         // Filter out events we don't care about
@@ -294,10 +300,10 @@ impl FileWatcher {
                 notify::event::AccessMode::Write,
             )) => {
                 // These are the events we want to process
-                eprintln!("[DEBUG] Event ACCEPTED by filter: {:?}", event.kind);
+                log::debug!("Event ACCEPTED by filter: {:?}", event.kind);
             }
             _ => {
-                eprintln!("[DEBUG] Event IGNORED by filter: {:?}", event.kind);
+                log::debug!("Event IGNORED by filter: {:?}", event.kind);
                 return; // Ignore other event types
             }
         }
@@ -368,25 +374,42 @@ impl FileWatcher {
 
             log::info!("Executing command: {}", command);
 
+            let quiet = self.quiet;
+
             // Execute command asynchronously
             tokio::spawn(async move {
                 match Self::execute_shell_command(&command).await {
                     Ok(output) => {
                         log::debug!("Command executed successfully");
-                        if !output.stdout.is_empty() {
-                            log::debug!(
-                                "Command stdout: {}",
-                                String::from_utf8_lossy(&output.stdout)
-                            );
-                        }
-                        if !output.stderr.is_empty() {
-                            log::warn!(
-                                "Command stderr: {}",
-                                String::from_utf8_lossy(&output.stderr)
-                            );
+
+                        // Show command output unless --quiet flag is set
+                        if !quiet {
+                            if !output.stdout.is_empty() {
+                                let stdout = String::from_utf8_lossy(&output.stdout);
+                                print!("{}", stdout);
+                            }
+                            if !output.stderr.is_empty() {
+                                let stderr = String::from_utf8_lossy(&output.stderr);
+                                eprint!("{}", stderr);
+                            }
+                        } else {
+                            // In quiet mode, still log at debug level
+                            if !output.stdout.is_empty() {
+                                log::debug!(
+                                    "Command stdout: {}",
+                                    String::from_utf8_lossy(&output.stdout)
+                                );
+                            }
+                            if !output.stderr.is_empty() {
+                                log::debug!(
+                                    "Command stderr: {}",
+                                    String::from_utf8_lossy(&output.stderr)
+                                );
+                            }
                         }
                     }
                     Err(e) => {
+                        eprintln!("❌ Command failed: {}", e);
                         log::error!("Failed to execute command '{}': {}", command, e);
                     }
                 }
@@ -680,7 +703,15 @@ mod tests {
             on_change: None,
         };
 
-        let result = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0);
+        let result = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        );
         assert!(result.is_ok());
     }
 
@@ -699,6 +730,8 @@ mod tests {
             vec![],
             config,
             0,
+            false,
+            false,
         );
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -718,7 +751,7 @@ mod tests {
             on_change: None,
         };
 
-        let result = FileWatcher::new(file_path, vec![], vec![], config, 0);
+        let result = FileWatcher::new(file_path, vec![], vec![], config, 0, false, false);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("Path is not a directory"));
@@ -740,6 +773,8 @@ mod tests {
             vec![],
             config,
             0,
+            false,
+            false,
         );
         assert!(result.is_err());
     }
@@ -760,6 +795,8 @@ mod tests {
             vec!["[invalid".to_string()],
             config,
             0,
+            false,
+            false,
         );
         assert!(result.is_err());
     }
@@ -835,8 +872,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // Use canonicalized path since FileWatcher stores canonicalized paths
         let file_path = temp_dir.path().canonicalize().unwrap().join("test.txt");
@@ -855,8 +900,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // Use canonicalized path since FileWatcher stores canonicalized paths
         let file_path = temp_dir
@@ -880,8 +933,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // Try with a path outside the watch directory
         let outside_path = PathBuf::from("/tmp/outside.txt");
@@ -1036,6 +1097,8 @@ mod tests {
             vec!["target/**".to_string()],
             config,
             0,
+            false,
+            false,
         );
 
         assert!(watcher.is_ok());
@@ -1088,8 +1151,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // Create a test file
         let test_file = temp_dir.path().join("test.txt");
@@ -1124,6 +1195,8 @@ mod tests {
             vec![],
             config,
             0,
+            false,
+            false,
         )
         .unwrap();
 
@@ -1153,8 +1226,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1181,8 +1262,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1207,8 +1296,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // Use a path that doesn't exist
         let nonexistent_file = temp_dir
@@ -1238,8 +1335,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         let test_file = temp_dir.path().join("new.txt");
         fs::write(&test_file, "new").unwrap();
@@ -1263,8 +1368,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         // For delete events, file doesn't exist
         let deleted_file = temp_dir.path().canonicalize().unwrap().join("deleted.txt");
@@ -1306,8 +1419,16 @@ mod tests {
             on_change: None,
         };
 
-        let watcher =
-            FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0).unwrap();
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        )
+        .unwrap();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").unwrap();
@@ -1338,7 +1459,15 @@ mod tests {
             on_change: Some("echo test".to_string()),
         };
 
-        let watcher = FileWatcher::new(temp_dir.path().to_path_buf(), vec![], vec![], config, 0);
+        let watcher = FileWatcher::new(
+            temp_dir.path().to_path_buf(),
+            vec![],
+            vec![],
+            config,
+            0,
+            false,
+            false,
+        );
         assert!(watcher.is_ok());
 
         // The watcher is valid and could start_watching if we called it

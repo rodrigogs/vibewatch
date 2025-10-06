@@ -46,6 +46,13 @@ struct Args {
     )]
     verbose: bool,
 
+    /// Suppress command output (only show file change notifications)
+    #[arg(short, long, help_heading = GENERAL_HELP)]
+    #[arg(
+        help = "Don't display command output (stdout/stderr)\n\nStill shows file change events and errors. Useful when you only care about which files changed"
+    )]
+    quiet: bool,
+
     /// Debounce delay in milliseconds to coalesce rapid events
     #[arg(long, value_name = "MS", default_value = "100", help_heading = GENERAL_HELP)]
     #[arg(
@@ -95,6 +102,8 @@ fn create_watcher_from_args(args: Args) -> anyhow::Result<watcher::FileWatcher> 
             on_change: args.on_change,
         },
         args.debounce,
+        args.verbose,
+        args.quiet,
     )
 }
 
@@ -347,6 +356,7 @@ mod tests {
             exclude: vec![],
             include: vec![],
             verbose: false,
+            quiet: false,
             debounce: 0,
             on_create: None,
             on_modify: None,
@@ -368,6 +378,7 @@ mod tests {
             exclude: vec!["*.tmp".to_string()],
             include: vec!["*.rs".to_string()],
             verbose: true,
+            quiet: false,
             debounce: 100,
             on_create: Some("echo created".to_string()),
             on_modify: Some("echo modified".to_string()),
@@ -386,6 +397,7 @@ mod tests {
             exclude: vec![],
             include: vec![],
             verbose: false,
+            quiet: false,
             debounce: 0,
             on_create: None,
             on_modify: None,
@@ -407,6 +419,7 @@ mod tests {
             exclude: vec![],
             include: vec!["[invalid".to_string()],
             verbose: false,
+            quiet: false,
             debounce: 0,
             on_create: None,
             on_modify: None,
