@@ -24,6 +24,8 @@ env_logger = "0.11"
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "time", "sync", "signal"] }
 # Shell-like command parsing with quote support
 shell-words = "1.1"
+# Timestamp formatting for structured logging
+chrono = "0.4"
 
 [dev-dependencies]
 # Mocking framework

@@ -148,7 +148,6 @@ pub struct FileWatcher {
     filter: PatternFilter,
     command_config: CommandConfig,
     debounce_ms: u64,
-    verbose: bool,
     quiet: bool,
 }
 
@@ -160,7 +159,7 @@ impl FileWatcher {
         exclude_patterns: Vec<String>,
         command_config: CommandConfig,
         debounce_ms: u64,
-        verbose: bool,
+        _verbose: bool,
         quiet: bool,
     ) -> Result<Self> {
         // Ensure the watch path exists
@@ -184,7 +183,6 @@ impl FileWatcher {
             filter,
             command_config,
             debounce_ms,
-            verbose,
             quiet,
         })
     }
@@ -355,14 +353,15 @@ impl FileWatcher {
 
     /// Log file change with appropriate formatting (static version)
     fn log_file_change(path: &Path, event_kind: &EventKind) {
+        let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
         let event_type = match event_kind {
-            EventKind::Create(_) => "📝 Created",
-            EventKind::Modify(_) => "✏️  Modified",
-            EventKind::Remove(_) => "🗑️  Removed",
-            _ => "📄 Changed",
+            EventKind::Create(_) => "CREATED",
+            EventKind::Modify(_) => "MODIFIED",
+            EventKind::Remove(_) => "DELETED",
+            _ => "CHANGED",
         };
 
-        println!("{}: {}", event_type, path.display());
+        println!("[{}] [{}] {}", timestamp, event_type, path.display());
         log::debug!("File event: {:?} - {}", event_kind, path.display());
     }
 
@@ -372,7 +371,8 @@ impl FileWatcher {
             let context = TemplateContext::new(path, relative_path, event_kind, &self.watch_path);
             let command = context.substitute_template(command_template);
 
-            log::info!("Executing command: {}", command);
+            let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
+            println!("[{}] Executing command: {}", timestamp, command);
 
             let quiet = self.quiet;
 
@@ -407,9 +407,22 @@ impl FileWatcher {
                                 );
                             }
                         }
+
+                        // Log command completion with exit code
+                        let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
+                        if let Some(code) = output.status.code() {
+                            if output.status.success() {
+                                println!("[{}] Command succeeded (exit code: {})", timestamp, code);
+                            } else {
+                                println!("[{}] Command failed (exit code: {})", timestamp, code);
+                            }
+                        } else {
+                            println!("[{}] Command terminated by signal", timestamp);
+                        }
                     }
                     Err(e) => {
-                        eprintln!("❌ Command failed: {}", e);
+                        let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
+                        println!("[{}] Command failed to execute: {}", timestamp, e);
                         log::error!("Failed to execute command '{}': {}", command, e);
                     }
                 }
@@ -436,10 +449,7 @@ impl FileWatcher {
             .await
             .context("Failed to execute command")?;
 
-        if !output.status.success() {
-            anyhow::bail!("Command failed with exit code: {:?}", output.status.code());
-        }
-
+        // Return output regardless of exit code - caller will check status
         Ok(output)
     }
 }
@@ -823,7 +833,10 @@ mod tests {
     async fn test_execute_shell_command_failure() {
         // Use a command that should fail
         let result = FileWatcher::execute_shell_command("false").await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
     }
 
     #[tokio::test]
