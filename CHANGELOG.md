@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/rodrigogs/vibewatch/compare/v0.3.0...v0.4.0) (2025-10-06)
+
+
+### Features
+
+* add --quiet flag and show command output to users ([47b71c5](https://github.com/rodrigogs/vibewatch/commit/47b71c5d81c818fd085732d20badec26f4cc62ea))
+* implement structured, objective logging with timestamps and exit codes ([c7c251c](https://github.com/rodrigogs/vibewatch/commit/c7c251cc58d7bc91ba17e643f405fe28e90cfca9))
+
+
+### Bug Fixes
+
+* use PAT for Release Please to trigger CI workflows on PRs ([a426ddc](https://github.com/rodrigogs/vibewatch/commit/a426ddc28bfce1a946a7c31b4f1797f9f440fb57))
+
 ## [0.3.0](https://github.com/rodrigogs/vibewatch/compare/v0.2.1...v0.3.0) (2025-10-06)
 
 
