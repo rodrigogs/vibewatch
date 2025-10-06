@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/rodrigogs/vibewatch/compare/v0.2.1...v0.3.0) (2025-10-06)
+
+
+### Features
+
+* **ci:** use taiki-e/upload-rust-binary-action for reliable cross-platform builds ([5ac53a8](https://github.com/rodrigogs/vibewatch/commit/5ac53a892b13a1f358f1264c75516432c1b90fd0))
+
 ## [0.2.1](https://github.com/rodrigogs/vibewatch/compare/v0.2.0...v0.2.1) (2025-10-06)
 
 
