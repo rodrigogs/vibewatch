@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/rodrigogs/vibewatch/compare/v0.4.0...v0.5.0) (2025-10-17)
+
+
+### Features
+
+* add brace expansion support for glob patterns ([58718db](https://github.com/rodrigogs/vibewatch/commit/58718dbb02b6218542fb90c80afdee312ccf243e))
+
+
+### Bug Fixes
+
+* collapse nested if statements in expand_braces to satisfy clippy ([0444d4a](https://github.com/rodrigogs/vibewatch/commit/0444d4a62fdb0175a0252b117a346a20042a33ce))
+
 ## [0.4.0](https://github.com/rodrigogs/vibewatch/compare/v0.3.0...v0.4.0) (2025-10-06)
 
 
