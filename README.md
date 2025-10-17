@@ -63,27 +63,30 @@ cargo build --release
 
 ## ⚡ Performance
 
-vibewatch includes significant performance optimizations:
+vibewatch is built in Rust for minimal resource usage and fast execution:
 
-- **40-60% fewer memory allocations** through static strings and optimized path handling
-- **15-30% faster event processing** via async channels (tokio)
-- **80-95% fewer redundant commands** with intelligent event debouncing
-- **Proper shell parsing** with quote support via shell-words crate
-- **Fast binary builds** - Reliable cross-platform compilation (~4 minutes for 5 platforms)
+- **Efficient memory usage** - Static strings and optimized path handling minimize allocations
+- **Async event processing** - Non-blocking command execution via tokio
+- **Smart debouncing** - Prevents redundant commands from rapid file changes (configurable with `--debounce`)
+- **Fast pattern matching** - Compiled glob patterns for quick file filtering
+- **Lightweight binary** - Single executable, no runtime dependencies
 
 ### Benchmarks
 
-Run comprehensive benchmarks yourself:
+Benchmark the core operations to verify performance on your system:
 
 ```bash
-cargo bench                               # All benchmarks
+cargo bench                               # Run all benchmarks
 cargo bench --bench template_substitution # Specific suite
+cargo bench --bench pattern_matching      # Pattern matching performance
 ```
 
-The benchmark suite includes:
-- **Template substitution** - Single-pass vs multi-pass string operations
-- **Path normalization** - Platform-specific optimization validation  
-- **Pattern matching** - Glob compilation and matching performance
+The benchmark suite measures:
+- **Template substitution** - Variable replacement in command strings
+- **Path normalization** - Cross-platform path handling
+- **Pattern matching** - Glob compilation and file filtering speed
+
+Results are compared against baseline measurements to track performance over time.
 
 ## Usage
 
