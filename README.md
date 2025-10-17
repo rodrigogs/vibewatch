@@ -98,7 +98,7 @@ vibewatch . --on-change "npm test"
 # Format Rust files when modified
 vibewatch src --include "*.rs" --on-modify "rustfmt {file_path}"
 
-# Run linter on TypeScript files
+# Run linter on TypeScript files (using brace expansion)
 vibewatch . --include "*.{ts,tsx}" --exclude "node_modules/**" --on-modify "npx eslint {file_path} --fix"
 
 # Different commands for different events
@@ -113,6 +113,26 @@ vibewatch src \
 - `{relative_path}` - Path relative to watched directory
 - `{absolute_path}` - Absolute path to the changed file
 - `{event_type}` - Type of event (create, modify, delete)
+
+**Brace Expansion:** You can use brace expansion syntax for convenience with both `--include` and `--exclude` patterns:
+```bash
+# Include patterns - these are equivalent:
+vibewatch . --include "*.{ts,tsx}"
+vibewatch . --include "*.ts" --include "*.tsx"
+
+# Works with multiple extensions:
+vibewatch . --include "*.{js,jsx,ts,tsx}"
+
+# Works with paths:
+vibewatch . --include "src/**/*.{rs,toml}"
+
+# Exclude patterns - these are equivalent:
+vibewatch . --exclude "{target,dist,node_modules}/**"
+vibewatch . --exclude "target/**" --exclude "dist/**" --exclude "node_modules/**"
+
+# Combined include and exclude with brace expansion:
+vibewatch . --include "src/**/*.{rs,toml}" --exclude "{target,build}/**"
+```
 
 ### Watch-Only Mode
 
@@ -164,7 +184,7 @@ vibewatch . \
 - `--on-change <COMMAND>`: Run command on any file change (fallback)
 
 **Filtering:**
-- `-i, --include <PATTERN>`: Include patterns like `*.ts`, `*.tsx`, `*.rs`
+- `-i, --include <PATTERN>`: Include patterns like `*.ts`, `*.rs` (use multiple times for multiple patterns)
 - `-e, --exclude <PATTERN>`: Exclude patterns like `node_modules/**`, `.git/**`, `.next/**`
 
 **General:**
@@ -211,7 +231,7 @@ vibewatch provides objective, timestamp-based logs for monitoring and automation
 
 ```bash
 vibewatch src \
-  --include "*.ts" --include "*.tsx" \
+  --include "*.{ts,tsx}" \
   --exclude "node_modules/**" --exclude "dist/**" \
   --on-modify "npx prettier --write {file_path}"
 ```
@@ -266,17 +286,21 @@ The application is structured for extensibility:
 - `.next/**` - Next.js build files
 - `target/**` - Rust build directory
 - `dist/**` - Build output directory
+- `{target,dist,build}/**` - Multiple build directories (brace expansion)
 - `*.tmp` - Temporary files
 - `*.swp` - Vim swap files
+- `*.{tmp,swp,bak}` - Multiple temporary file types (brace expansion)
 
 ### Include Patterns
 - `*.rs` - Rust source files
-- `*.ts`, `*.tsx` - TypeScript files
-- `*.js`, `*.jsx` - JavaScript files  
+- `*.{ts,tsx}` - TypeScript files (brace expansion supported)
+- `*.{js,jsx}` - JavaScript files (brace expansion supported)
 - `*.py` - Python files
 - `*.go` - Go files
-- `*.cpp`, `*.c`, `*.h` - C/C++ files
+- `*.{cpp,c,h}` - C/C++ files (brace expansion supported)
 - `*.md` - Markdown files
+
+**Note:** Brace expansion like `*.{ext1,ext2}` or `{dir1,dir2}/**` works with both `--include` and `--exclude` patterns. The syntax is automatically expanded to multiple patterns before glob compilation. You can also use multiple flags if you prefer explicit patterns.
 
 ## Future Enhancements
 

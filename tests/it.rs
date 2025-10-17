@@ -621,3 +621,50 @@ fn test_specific_event_commands() {
         "Delete command was not executed"
     );
 }
+
+/// Test brace expansion syntax in include patterns
+#[test]
+fn test_filter_brace_expansion_pattern() {
+    let temp_dir = common::setup_test_dir();
+
+    let marker_file = temp_dir.child("brace-marker.txt");
+    let marker_path = marker_file.path().display().to_string();
+    let command = common::touch_command(&marker_path);
+
+    // Watch using brace expansion: *.{rs,toml}
+    let mut child = StdCommand::cargo_bin("vibewatch")
+        .unwrap()
+        .arg(temp_dir.path())
+        .arg("--include")
+        .arg("*.{rs,toml}") // Brace expansion pattern
+        .arg("--on-change")
+        .arg(&command)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to start vibewatch");
+
+    thread::sleep(common::WATCHER_STARTUP_TIME);
+
+    // Create a .rs file (should be detected via brace expansion)
+    common::create_test_file(&temp_dir, "main.rs", "fn main() {}");
+
+    // Wait for detection and command execution with polling
+    let marker_exists = common::wait_for_file(marker_file.path(), common::MARKER_FILE_POLL_TIMEOUT);
+
+    // Create a .toml file (should also be detected via brace expansion)
+    common::create_test_file(&temp_dir, "Cargo.toml", "[package]");
+    thread::sleep(common::EVENT_DETECTION_TIME);
+
+    // Create a .md file (should be ignored - not in brace expansion)
+    common::create_test_file(&temp_dir, "README.md", "# Readme");
+    thread::sleep(common::EVENT_DETECTION_TIME);
+
+    child.kill().expect("Failed to kill vibewatch");
+
+    // The marker file should exist, proving brace expansion worked
+    assert!(
+        marker_exists,
+        "Brace expansion pattern *.{{rs,toml}} should match .rs and .toml files"
+    );
+}

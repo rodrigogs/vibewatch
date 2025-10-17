@@ -9,13 +9,58 @@ pub struct PatternFilter {
     exclude_patterns: Vec<Pattern>,
 }
 
+/// Expand brace patterns like "*.{rs,toml}" into ["*.rs", "*.toml"]
+fn expand_braces(pattern: &str) -> Vec<String> {
+    // Look for pattern like "prefix{ext1,ext2,ext3}suffix"
+    if let Some(start) = pattern.find('{') {
+        if let Some(end) = pattern.find('}') {
+            if start < end {
+                let prefix = &pattern[..start];
+                let suffix = &pattern[end + 1..];
+                let extensions = &pattern[start + 1..end];
+
+                return extensions
+                    .split(',')
+                    .map(|ext| format!("{}{}{}", prefix, ext.trim(), suffix))
+                    .collect();
+            }
+        }
+    }
+
+    // No braces found, return original pattern
+    vec![pattern.to_string()]
+}
+
 impl PatternFilter {
     /// Create a new pattern filter with include and exclude patterns
     pub fn new(include_patterns: Vec<String>, exclude_patterns: Vec<String>) -> Result<Self> {
-        let include_patterns = Self::compile_patterns(include_patterns)
+        // Expand brace patterns before compilation
+        let expanded_include: Vec<String> = include_patterns
+            .iter()
+            .flat_map(|p| {
+                let expanded = expand_braces(p);
+                if log::log_enabled!(log::Level::Debug) && expanded.len() > 1 {
+                    log::debug!("Expanded include pattern '{}' to {:?}", p, expanded);
+                }
+                expanded
+            })
+            .collect();
+
+        let expanded_exclude: Vec<String> = exclude_patterns
+            .iter()
+            .flat_map(|p| {
+                let expanded = expand_braces(p);
+                if log::log_enabled!(log::Level::Debug) && expanded.len() > 1 {
+                    log::debug!("Expanded exclude pattern '{}' to {:?}", p, expanded);
+                }
+                expanded
+            })
+            .collect();
+
+        let include_patterns = Self::compile_patterns(expanded_include)
             .context("Failed to compile include patterns")?;
 
-        let exclude_patterns = Self::compile_patterns(exclude_patterns)
+        let exclude_patterns = Self::compile_patterns(expanded_exclude)
             .context("Failed to compile exclude patterns")?;
 
         Ok(Self {
@@ -302,6 +347,131 @@ mod tests {
         assert!(filter.should_watch(&PathBuf::from("src/lib.rs")));
         assert!(!filter.should_watch(&PathBuf::from("tests/test.rs")));
         assert!(!filter.should_watch(&PathBuf::from("main.rs")));
+    }
+
+    // Brace expansion tests
+    #[test]
+    fn test_brace_expansion_basic() {
+        let expanded = expand_braces("*.{rs,toml}");
+        assert_eq!(expanded, vec!["*.rs", "*.toml"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_three_extensions() {
+        let expanded = expand_braces("*.{js,ts,jsx}");
+        assert_eq!(expanded, vec!["*.js", "*.ts", "*.jsx"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_with_prefix_and_suffix() {
+        let expanded = expand_braces("src/**/*.{rs,toml}");
+        assert_eq!(expanded, vec!["src/**/*.rs", "src/**/*.toml"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_with_spaces() {
+        let expanded = expand_braces("*.{rs, toml, md}");
+        assert_eq!(expanded, vec!["*.rs", "*.toml", "*.md"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_no_braces() {
+        let expanded = expand_braces("*.rs");
+        assert_eq!(expanded, vec!["*.rs"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_malformed_no_closing() {
+        let expanded = expand_braces("*.{rs,toml");
+        assert_eq!(expanded, vec!["*.{rs,toml"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_malformed_no_opening() {
+        let expanded = expand_braces("*.rs,toml}");
+        assert_eq!(expanded, vec!["*.rs,toml}"]);
+    }
+
+    #[test]
+    fn test_brace_expansion_empty() {
+        let expanded = expand_braces("*.{}");
+        assert_eq!(expanded, vec!["*."]);
+    }
+
+    #[test]
+    fn test_filter_with_brace_expansion() {
+        let filter = PatternFilter::new(vec!["*.{rs,toml}".to_string()], vec![]).unwrap();
+
+        assert!(filter.should_watch(&PathBuf::from("main.rs")));
+        assert!(filter.should_watch(&PathBuf::from("Cargo.toml")));
+        assert!(!filter.should_watch(&PathBuf::from("README.md")));
+    }
+
+    #[test]
+    fn test_filter_with_brace_expansion_typescript() {
+        let filter = PatternFilter::new(vec!["*.{ts,tsx}".to_string()], vec![]).unwrap();
+
+        assert!(filter.should_watch(&PathBuf::from("App.tsx")));
+        assert!(filter.should_watch(&PathBuf::from("utils.ts")));
+        assert!(!filter.should_watch(&PathBuf::from("index.js")));
+    }
+
+    #[test]
+    fn test_filter_with_multiple_brace_patterns() {
+        let filter = PatternFilter::new(
+            vec!["*.{rs,toml}".to_string(), "*.{md,txt}".to_string()],
+            vec![],
+        )
+        .unwrap();
+
+        assert!(filter.should_watch(&PathBuf::from("main.rs")));
+        assert!(filter.should_watch(&PathBuf::from("Cargo.toml")));
+        assert!(filter.should_watch(&PathBuf::from("README.md")));
+        assert!(filter.should_watch(&PathBuf::from("notes.txt")));
+        assert!(!filter.should_watch(&PathBuf::from("script.sh")));
+    }
+
+    #[test]
+    fn test_filter_brace_expansion_with_exclude() {
+        let filter = PatternFilter::new(
+            vec!["*.{rs,toml}".to_string()],
+            vec!["target/**".to_string()],
+        )
+        .unwrap();
+
+        assert!(filter.should_watch(&PathBuf::from("src/main.rs")));
+        assert!(filter.should_watch(&PathBuf::from("Cargo.toml")));
+        assert!(!filter.should_watch(&PathBuf::from("target/debug/main.rs")));
+        assert!(!filter.should_watch(&PathBuf::from("README.md")));
+    }
+
+    #[rstest]
+    #[case("*.{ts,tsx}", "file.ts", true)]
+    #[case("*.{ts,tsx}", "file.tsx", true)]
+    #[case("*.{ts,tsx}", "file.js", false)]
+    #[case("*.{js,jsx,ts,tsx}", "app.js", true)]
+    #[case("*.{js,jsx,ts,tsx}", "app.jsx", true)]
+    #[case("*.{js,jsx,ts,tsx}", "app.ts", true)]
+    #[case("*.{js,jsx,ts,tsx}", "app.tsx", true)]
+    #[case("*.{js,jsx,ts,tsx}", "app.py", false)]
+    #[case("src/**/*.{rs,toml}", "src/main.rs", true)]
+    #[case("src/**/*.{rs,toml}", "src/lib/util.rs", true)]
+    #[case("src/**/*.{rs,toml}", "src/Cargo.toml", true)]
+    #[case("src/**/*.{rs,toml}", "tests/test.rs", false)]
+    fn test_brace_pattern_matching(
+        #[case] pattern: &str,
+        #[case] path: &str,
+        #[case] should_match: bool,
+    ) {
+        let filter = PatternFilter::new(vec![pattern.to_string()], vec![]).unwrap();
+        assert_eq!(
+            should_match,
+            filter.should_watch(&PathBuf::from(path)),
+            "Brace pattern '{}' with path '{}' should be {}",
+            pattern,
+            path,
+            if should_match { "matched" } else { "rejected" }
+        );
     }
 
     #[test]
