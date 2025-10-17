@@ -1,0 +1,44 @@
+#!/bin/sh
+# Pre-commit hook for vibewatch
+# Runs formatting and linting checks before allowing commits
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "❌ Error: cargo not found. Please install Rust."
+    exit 1
+fi
+
+# Run rustfmt check
+echo "📝 Checking code formatting with rustfmt..."
+if ! cargo fmt --check; then
+    echo ""
+    echo "❌ Code formatting check failed!"
+    echo "💡 Run 'cargo fmt' or 'just fmt' to fix formatting issues."
+    exit 1
+fi
+
+# Run clippy
+echo "🔎 Running clippy linter..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo ""
+    echo "❌ Clippy linting failed!"
+    echo "💡 Fix the warnings above or run 'cargo clippy --fix' to auto-fix."
+    exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+if ! cargo test --quiet; then
+    echo ""
+    echo "❌ Tests failed!"
+    echo "💡 Fix failing tests before committing."
+    exit 1
+fi
+
+echo ""
+echo "✅ All pre-commit checks passed!"
+exit 0

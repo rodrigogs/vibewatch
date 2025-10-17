@@ -5,6 +5,16 @@
 default:
     @just --list
 
+# Setup git hooks for pre-commit checks
+setup-hooks:
+    @echo "🔧 Setting up Git hooks..."
+    git config core.hooksPath .githooks
+    chmod +x .githooks/pre-commit
+    chmod +x .githooks/pre-push
+    @echo "✅ Git hooks installed successfully!"
+    @echo "Hooks will run: cargo fmt --check, cargo clippy, cargo test"
+    @echo "To bypass hooks (not recommended): git commit --no-verify"
+
 # Run all tests (187 total: 140 unit + 21 filesystem + 26 integration)
 test:
     cargo test

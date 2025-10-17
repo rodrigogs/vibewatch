@@ -12,19 +12,18 @@ pub struct PatternFilter {
 /// Expand brace patterns like "*.{rs,toml}" into ["*.rs", "*.toml"]
 fn expand_braces(pattern: &str) -> Vec<String> {
     // Look for pattern like "prefix{ext1,ext2,ext3}suffix"
-    if let Some(start) = pattern.find('{') {
-        if let Some(end) = pattern.find('}') {
-            if start < end {
-                let prefix = &pattern[..start];
-                let suffix = &pattern[end + 1..];
-                let extensions = &pattern[start + 1..end];
+    if let Some(start) = pattern.find('{')
+        && let Some(end) = pattern.find('}')
+        && start < end
+    {
+        let prefix = &pattern[..start];
+        let suffix = &pattern[end + 1..];
+        let extensions = &pattern[start + 1..end];
 
-                return extensions
-                    .split(',')
-                    .map(|ext| format!("{}{}{}", prefix, ext.trim(), suffix))
-                    .collect();
-            }
-        }
+        return extensions
+            .split(',')
+            .map(|ext| format!("{}{}{}", prefix, ext.trim(), suffix))
+            .collect();
     }
 
     // No braces found, return original pattern

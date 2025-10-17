@@ -1,0 +1,35 @@
+#!/bin/sh
+# Pre-push hook for vibewatch
+# Runs full test suite before pushing to remote
+
+set -e
+
+echo "🚀 Running pre-push checks..."
+
+# Check if cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "❌ Error: cargo not found. Please install Rust."
+    exit 1
+fi
+
+# Run full test suite
+echo "🧪 Running full test suite..."
+if ! cargo test; then
+    echo ""
+    echo "❌ Test suite failed!"
+    echo "💡 Fix failing tests before pushing."
+    exit 1
+fi
+
+# Run clippy with all targets
+echo "🔎 Running clippy on all targets..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo ""
+    echo "❌ Clippy linting failed!"
+    echo "💡 Fix the warnings above before pushing."
+    exit 1
+fi
+
+echo ""
+echo "✅ All pre-push checks passed!"
+exit 0
